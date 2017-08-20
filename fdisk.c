@@ -16,6 +16,7 @@
 */
 
 #include <stdio.h>
+#include <string.h>
 
 #include "fdisk_hal.h"
 #include "fdisk_memory.h"
@@ -275,7 +276,7 @@ int main(int argc,char **argv)
 	  partition_sectors,available_sectors);
 #else
   // Tell use how many sectors available for partition
-  write_line("$         SECTORS AVAILABLE FOR PARTITION.",0);
+  write_line("$         Sectorsr available for partition.",0);
   screen_hex(screen_line_address-79,partition_sectors);
 #endif
   
@@ -295,15 +296,36 @@ int main(int argc,char **argv)
     sectors_required=2*fat_sectors+((fs_clusters-2)*sectors_per_cluster);
   }
 #ifndef __CC65__
-  fprintf(stderr,"CREATING FILE SYSTEM WITH %u (0x%x) CLUSTERS, %d SECTORS PER FAT, %d RESERVED SECTORS.\r\n",
+  fprintf(stderr,"Creating File System with %u (0x%x) CLUSTERS, %d SECTORS PER FAT, %d RESERVED SECTORS.\r\n",
 	  fs_clusters,fs_clusters,fat_sectors,reserved_sectors);
 #else
-  write_line("FORMATTING SD CARD WITH NEW PARTITION TABLE AND FAT32 FILE SYSTEM",0);
-  write_line("  $         CLUSTERS,       SECTORS/FAT,       RESERVED SECTORS.",0);
+  write_line("Format SD Card with new partition table and FAT32 file fystem?",0);
+  write_line("  $         Clusters,       Sectors/FAT,       Reserved Sectors.",0);
   screen_hex(screen_line_address-80+3,fs_clusters);
   screen_decimal(screen_line_address-80+22,fat_sectors);
   screen_decimal(screen_line_address-80+41,reserved_sectors);
+  while(1)
+  {
+    char line_of_input[80];
+    unsigned char len;
+    write_line(" ",0);
+    write_line("Type DELETE EVERYTHING to continue:",0);
+    recolour_last_line(2);
+    len=read_line(line_of_input,80);
+    if (len) {
+      write_line(line_of_input,3);
+      recolour_last_line(7);
+    }
+    if (strcmp("DELETE EVERYTHING",line_of_input)) {
+      write_line("Entered text does not match. Try again.",0);
+      recolour_last_line(8);
+    } else
+      // String matches -- so proceed
+      break;
+  }
 #endif
+
+  
   
   fat1_sector=0x0800+reserved_sectors;
   fat2_sector=fat1_sector+fat_sectors;
@@ -313,19 +335,19 @@ int main(int argc,char **argv)
   // MBR is always the first sector of a disk
 #ifdef __CC65__
   write_line(" ",0);
-  write_line("WRITING PARTITION TABLE / MASTER BOOT RECORD...",0);
+  write_line("Writing Partition Table / Master Boot Record...",0);
 #endif
   build_mbr(partition_sectors);
   sdcard_writesector(0);
 
 #ifdef __CC65__
-  write_line("ERASING RESERVED SECTORS BEFORE PARTITION...",0);
+  write_line("Erasing reserved sectors before partition...",0);
 #endif
   // Blank intervening sectors
   sdcard_erase(0+1,0x0800-1);
   
 #ifdef __CC65__
-  write_line("WRITING FAT BOOT SECTOR...",0);
+  write_line("Writing FAT Boot Sector...",0);
 #endif
   // Partition starts at fixed position of sector 2048, i.e., 1MB
   build_dosbootsector(volume_name,
@@ -335,7 +357,7 @@ int main(int argc,char **argv)
   sdcard_writesector(0x0806); // Backup boot sector at partition + 6
 
 #ifdef __CC65__
-  write_line("WRITING FAT INFORMATION BLOCK (AND BACKUP)...",0);
+  write_line("Writing FAT Information Block (and backup copy)...",0);
 #endif
   // FAT32 FS Information block (and backup)
   build_fs_information_sector(fs_clusters);
@@ -344,10 +366,10 @@ int main(int argc,char **argv)
 
   // FATs
 #ifndef __CC65__
-  fprintf(stderr,"WRITING FATS AT OFFSETS 0x%x AND 0x%x\r\n",
+  fprintf(stderr,"Writing FATs at offsets 0x%x AND 0x%x\r\n",
 	  fat1_sector*512,fat2_sector*512);
 #else
-  write_line("WRITING FATS AT $         AND $         ...",0);
+  write_line("Writing FATs at $         and $         ...",0);
   screen_hex(screen_line_address-80+17,fat1_sector*512);
   screen_hex(screen_line_address-80+31,fat2_sector*512);
 #endif
@@ -356,7 +378,7 @@ int main(int argc,char **argv)
   sdcard_writesector(fat2_sector);
 
 #ifdef __CC65__
-  write_line("WRITING ROOT DIRECTORY...",0);
+  write_line("Writing Root Directory...",0);
 #endif
   // Root directory
   build_root_dir(volume_name);
@@ -364,7 +386,7 @@ int main(int argc,char **argv)
 
 #ifdef __CC65__
   write_line(" ",0);
-  write_line("CLEARING FILE SYSTEM DATA STRUCTURES...",0);
+  write_line("Clearing file system data structures...",0);
 #endif
   // Make sure all other sectors are empty
   sdcard_erase(0x0801+1,0x0806-1);
@@ -376,7 +398,7 @@ int main(int argc,char **argv)
 #ifdef __CC65__
   POKE(0xd021U,6);
   write_line(" ",0);
-  write_line("SD CARD HAS BEEN FORMATTED.  REMOVE, COPY MEGA65.ROM, REINSERT AND REBOOT.",0);
+  write_line("SD Card has been formatted.  Remove, Copy MEGA65.ROM, Reinsert AND Reboot.",0);
   while(1) continue;
 #else
   return 0;

@@ -16,7 +16,7 @@ unsigned char screen_hex_buffer[6];
 
 unsigned char screen_hex_digits[16]={
   '0','1','2','3','4','5',
-  '6','7','8','9',1,2,3,4,5,6};
+  '6','7','8','9',0x41,0x42,0x43,0x44,0x45,0x46};
 unsigned char to_screen_hex(unsigned char c)
 {
   return screen_hex_digits[c&0xf];
@@ -65,6 +65,13 @@ void write_line(char *s,char col)
   while(s[len]) len++;
   lcopy((long)&s[0],screen_line_address+col,len);
   screen_line_address+=80;
+}
+
+void recolour_last_line(char colour)
+{
+  long colour_address=COLOUR_RAM_ADDRESS+(screen_line_address-SCREEN_ADDRESS)-80;
+  lfill(colour_address,colour,80);
+  return;
 }
 
 
@@ -192,4 +199,30 @@ void set_screen_attributes(long p,unsigned char count,unsigned char attr)
     lpoke(addr,lpeek(addr)|attr);
     addr++;
   }
+}
+
+char read_line(char *buffer,unsigned char maxlen)
+{
+  char len=0;
+  char c;
+
+  // Read input using hardware keyboard scanner
+  while(len<maxlen) {
+    c=*(unsigned char *)0xD610;
+    if (c) {
+      // Clear key from hardware keyboard scanner
+      *(unsigned char *)0xd610=1;
+
+      if (c==0x0d)
+	{
+	  buffer[len]=0;
+	  return len;
+	}
+      else buffer[len++]=c;
+      
+      //      *(unsigned char *)0x8000 = c;
+    }
+  }
+
+  return len;
 }

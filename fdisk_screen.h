@@ -1,5 +1,5 @@
 #define SCREEN_ADDRESS (0x8000U)
-#define CHARSET_ADDRESS (0xA000U)
+#define CHARSET_ADDRESS (0x8800U)
 #define COLOUR_RAM_ADDRESS (0x1f800)
 #define FOOTER_ADDRESS (SCREEN_ADDRESS+24*80)
 
@@ -49,7 +49,9 @@ void screen_hex_byte(unsigned int addr,long value);
 void screen_decimal(unsigned int addr,unsigned int value);
 void set_screen_attributes(long p,unsigned char count,unsigned char attr);
 void write_line(char *s,char col);
-  
+void recolour_last_line(char colour);
+char read_line(char *buffer,char maxlen);
+
 extern long screen_line_address;
 
 extern unsigned char ascii_map[256];
