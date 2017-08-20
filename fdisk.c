@@ -276,7 +276,7 @@ int main(int argc,char **argv)
 	  partition_sectors,available_sectors);
 #else
   // Tell use how many sectors available for partition
-  write_line("$         Sectorsr available for partition.",0);
+  write_line("$         Sectors available for partition.",0);
   screen_hex(screen_line_address-79,partition_sectors);
 #endif
   
