@@ -20,7 +20,8 @@ ASSFILES=	fdisk.s \
 HEADERS=	Makefile \
 		fdisk_memory.h \
 		fdisk_screen.h \
-		fdisk_hal.h
+		fdisk_hal.h \
+		ascii.h
 
 DATAFILES=	ascii8x8.bin
 

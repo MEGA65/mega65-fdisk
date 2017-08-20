@@ -20,6 +20,7 @@
 #include "fdisk_hal.h"
 #include "fdisk_memory.h"
 #include "fdisk_screen.h"
+#include "ascii.h"
 
 #ifdef __CC65__
 // Sector buffer is the physical SD card buffer on M65 to avoid copying
