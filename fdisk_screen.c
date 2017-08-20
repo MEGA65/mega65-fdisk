@@ -1,6 +1,8 @@
 #include "fdisk_screen.h"
 #include "fdisk_memory.h"
 
+extern unsigned char *charset;
+
 long screen_line_address=SCREEN_ADDRESS;
 char screen_column=0;
 
@@ -130,11 +132,10 @@ void setup_screen(void)
 
   // Put screen memory somewhere (2KB required)
   // We are using $8000-$87FF for screen
-  // Using standard charset @ $9000
+  // Using custom charset @ $A000
   *(unsigned char *)0xD018U=
     (((CHARSET_ADDRESS-0x8000U)>>11)<<1)
     +(((SCREEN_ADDRESS-0x8000U)>>10)<<4);
-  
 
   // VIC RAM Bank to $8000-$BFFF
   v=*(unsigned char *)0xDD00U;
@@ -151,6 +152,9 @@ void setup_screen(void)
 
   // Clear colour RAM: white text
   lfill(0x1f800,0x01,2000);
+
+  // Copy ASCII charset into place
+  lcopy(charset,CHARSET_ADDRESS,0x800);
 
   // Set screen line address and write point
   screen_line_address=SCREEN_ADDRESS;

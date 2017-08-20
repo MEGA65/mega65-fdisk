@@ -14,7 +14,8 @@ M65IDESOURCES=	fdisk.c \
 ASSFILES=	fdisk.s \
 		fdisk_memory.s \
 		fdisk_screen.s \
-		fdisk_hal_mega65.s
+		fdisk_hal_mega65.s \
+		charset.s
 
 HEADERS=	Makefile \
 		fdisk_memory.h \
@@ -40,7 +41,7 @@ ascii.h:	asciih
 pngprepare:	pngprepare.c
 	$(CC) -I/usr/local/include -L/usr/local/lib -o pngprepare pngprepare.c -lpng
 
-m65fdisk.prg:	$(ASSFILES)
+m65fdisk.prg:	$(ASSFILES) $(DATAFILES)
 	$(CL65) $(COPTS) $(LOPTS) -vm -m m65fdisk.map -o m65fdisk.prg $(ASSFILES)
 
 clean:
