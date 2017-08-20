@@ -1,0 +1,17 @@
+\#fdisk_screen.c#
+.#fdisk_screen.c
+ascii.h
+ascii8x8.bin
+asciih
+charset.o
+fdisk.o
+fdisk.s
+fdisk_hal_mega65.o
+fdisk_hal_mega65.s
+fdisk_memory.o
+fdisk_memory.s
+fdisk_screen.o
+fdisk_screen.s
+m65fdisk.map
+m65fdisk.prg
+pngprepare
