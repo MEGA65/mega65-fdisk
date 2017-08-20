@@ -2,7 +2,7 @@
 CC65=	/usr/local/bin/cc65
 CL65=	/usr/local/bin/cl65
 COPTS=	-t c64 -O -Or -Oi -Os --cpu 65c02
-LOPTS=	-C c64-m65fdisk.cfg
+LOPTS=	
 
 FILES=		m65fdisk.prg 
 
@@ -29,7 +29,6 @@ DATAFILES=	ascii8x8.bin
 
 all:	$(FILES)
 
-
 ascii8x8.bin: ascii00-7f.png pngprepare
 	./pngprepare charrom ascii00-7f.png ascii8x8.bin
 
@@ -41,7 +40,7 @@ ascii.h:	asciih
 pngprepare:	pngprepare.c
 	$(CC) -I/usr/local/include -L/usr/local/lib -o pngprepare pngprepare.c -lpng
 
-m65fdisk.prg:	$(ASSFILES) c64-m65fdisk.cfg
+m65fdisk.prg:	$(ASSFILES)
 	$(CL65) $(COPTS) $(LOPTS) -vm -m m65fdisk.map -o m65fdisk.prg $(ASSFILES)
 
 clean:
