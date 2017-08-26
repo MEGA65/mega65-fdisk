@@ -333,6 +333,11 @@ void build_mega65_sys_sector(const uint32_t sys_partition_sectors)
   if (slot_count>0xffff) slot_count=0xffff;
   dir_size=1+(slot_count/4);
 
+  freeze_dir_sectors=dir_size;
+  service_dir_sectors=dir_size;
+  sys_partition_freeze_dir=0;
+  sys_partition_service_dir=freeze_dir_sectors+slot_size*slot_count;
+  
   write_line("$         Freeze and OS Service slots.",0);
   screen_hex(screen_line_address-79,slot_count);
   
