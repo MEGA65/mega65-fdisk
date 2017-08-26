@@ -40,7 +40,6 @@ void clear_sector_buffer(void)
 #endif
 }
 
-
 /* Build a master boot record that has the single partition we need in
    the correct place, and with the size of the partition set correctly.
 */
@@ -258,6 +257,11 @@ uint32_t sdcard_sectors;
 uint32_t sys_partition_start,sys_partition_sectors;
 uint32_t fat_partition_start,fat_partition_sectors;
 
+uint32_t sys_partition_freeze_dir;
+uint16_t freeze_dir_sectors;
+uint32_t sys_partition_service_dir;
+uint16_t service_dir_sectors;
+
 // Calculate clusters for file system, and FAT size
 uint32_t fs_clusters=0;
 uint32_t reserved_sectors=568; // not sure why we use this value
@@ -273,6 +277,96 @@ uint8_t volume_name[11]="M.E.G.A.65!";
 uint32_t sectors_required;
 uint32_t fat_available_sectors;
 
+void sector_buffer_write_uint16(const uint16_t offset,
+				 const uint32_t value)
+{
+  sector_buffer[offset+0]=(value>>0)&0xff;
+  sector_buffer[offset+1]=(value>>8)&0xff;
+}
+
+void sector_buffer_write_uint32(const uint16_t offset,
+				const uint32_t value)
+{
+  sector_buffer[offset+0]=(value>>0)&0xff;
+  sector_buffer[offset+1]=(value>>8)&0xff;
+  sector_buffer[offset+2]=(value>>16)&0xff;
+  sector_buffer[offset+3]=(value>>24)&0xff;
+}
+
+uint8_t sys_part_magic[]={'M','E','G','A','6','5','S','Y','S','0','0'};
+
+void build_mega65_sys_sector(const uint32_t sys_partition_sectors)
+{
+  /*
+    System partition has frozen program and system service areas, including 
+    directories for each.
+
+    We work out how many of each we can have (equal number of each), based
+    on the size we require them to be.
+
+    The size of each is subject to change, so is left flexible.  One thing
+    that is not resolved, is whether to allow including a D81 image in either.
+
+    For now, we will allow 128K RAM + 128KB "ROM" + 32KB colour RAM 
+    + 32KB IO regs (including 4KB thumbnail).
+    That all up means 320KB per frozen program slot.
+    
+    For some services at least, we intend to allow for a substantial part of
+    memory to be preserved, so we need to have a mechanism that indicates what
+    parts of which memory areas require preservation, and whether IO should be
+    preserved or not.
+
+    Simple apporach is KB start and end ranges for the four regions = 8 bytes.
+    This can go in the directory entries, which have 64 bytes for information.
+    We will also likely put the hardware/access permission flags in there
+    somewhere, too.
+
+    Anyway, so we need to divide the available space by (320KB + 128 bytes).
+    Two types of area means simplest approach with equal slots for both means
+    dividing space by (320KB + 128 bytes)*2= ~641KB.    
+  */
+  uint16_t i;
+  uint32_t slot_size=320*1024/512;
+  uint32_t slot_count=sys_partition_sectors/(641*1024/512);
+  uint16_t dir_size;
+
+  if (slot_count>0xffff) slot_count=0xffff;
+  dir_size=1+(slot_count/4);
+
+  write_line("$         Freeze and OS Service slots.",0);
+  screen_hex(screen_line_address-79,slot_count);
+  
+  
+  // Clear sector
+  clear_sector_buffer();
+
+  // Write magic bytes
+  for(i=0;i<11;i++) sector_buffer[i]=sys_part_magic[i];
+
+  // $010-$013 = Start of freeze program area
+  sector_buffer_write_uint32(0x10,0);
+  // $014-$017 = Size of freeze program area
+  sector_buffer_write_uint32(0x14,slot_size*slot_count+dir_size);
+  // $018-$01b = Size of each freeze program slot
+  sector_buffer_write_uint32(0x18,slot_size);
+  // $01c-$01d = Number of freeze slots
+  sector_buffer_write_uint16(0x1c,slot_count);
+  // $01e-$01f = Number of sectors in freeze slot directory
+  sector_buffer_write_uint16(0x1e,dir_size);
+
+  // $020-$023 = Start of freeze program area
+  sector_buffer_write_uint32(0x20,slot_size*slot_count+dir_size);
+  // $024-$027 = Size of service program area
+  sector_buffer_write_uint32(0x24,slot_size*slot_count+dir_size);
+  // $028-$02b = Size of each service slot
+  sector_buffer_write_uint32(0x28,slot_size);
+  // $02c-$02d = Number of service slots
+  sector_buffer_write_uint16(0x2c,slot_count);
+  // $02e-$02f = Number of sectors in service slot directory
+  sector_buffer_write_uint16(0x2e,dir_size);
+  
+  return;
+}
 
 #ifdef __CC65__
 void main(void)
@@ -380,10 +474,25 @@ int main(int argc,char **argv)
   sdcard_writesector(0);
 
 #ifdef __CC65__
-  write_line("Erasing reserved sectors before partition...",0);
+  write_line("Erasing reserved sectors before first partition...",0);
 #endif
   // Blank intervening sectors
   sdcard_erase(0+1,sys_partition_start-1);
+
+  // Write MEGA65 System partition header sector
+#ifdef __CC65__
+  write_line("Writing MEGA65 System Partition header sector...",0);
+#endif
+  build_mega65_sys_sector(sys_partition_sectors);
+  sdcard_writesector(sys_partition_start);
+
+  // erase frozen program directory
+  sdcard_erase(sys_partition_freeze_dir,
+	       sys_partition_freeze_dir+freeze_dir_sectors-1);
+
+  // erase system service image directory
+  sdcard_erase(sys_partition_service_dir,
+	       sys_partition_service_dir+service_dir_sectors-1);
   
 #ifdef __CC65__
   write_line("Writing FAT Boot Sector...",0);
