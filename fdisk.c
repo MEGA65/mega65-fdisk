@@ -44,7 +44,11 @@ void clear_sector_buffer(void)
 /* Build a master boot record that has the single partition we need in
    the correct place, and with the size of the partition set correctly.
 */
-void build_mbr(const uint32_t partition_sectors)
+void build_mbr(const uint32_t sys_partition_start,
+	       const uint32_t sys_partition_sectors,
+	       const uint32_t fat_partition_start,
+	       const uint32_t fat_partition_sectors
+	       )
 {
   clear_sector_buffer();
 
@@ -54,24 +58,46 @@ void build_mbr(const uint32_t partition_sectors)
   sector_buffer[0x1ba]=0xcb;
   sector_buffer[0x1bb]=0xa6;
 
-  // FAT32 Partition entry
+  // MEGA65 System Partition entry
   sector_buffer[0x1be]=0x00;  // Not bootable by DOS
   sector_buffer[0x1bf]=0x00;  // 3 bytes CHS starting point
   sector_buffer[0x1c0]=0x00;
   sector_buffer[0x1c1]=0x00;
-  sector_buffer[0x1c2]=0x0c;  // Partition type (VFAT32)
+  sector_buffer[0x1c2]=0x41;  // Partition type (MEGA65 System Partition)
   sector_buffer[0x1c3]=0x00;  // 3 bytes CHS end point - SHOULD CHANGE WITH DISK SIZE
   sector_buffer[0x1c4]=0x00;
   sector_buffer[0x1c5]=0x00;
-  sector_buffer[0x1c6]=0x00;  // LBA starting sector of partition (0x0800 = sector 2,048)
-  sector_buffer[0x1c7]=0x08;
-  sector_buffer[0x1c8]=0x00;
-  sector_buffer[0x1c9]=0x00;
+  // LBA starting sector of partition (usually @ 0x0800 = sector 2,048 = 1MB)
+  sector_buffer[0x1c6]=(sys_partition_start>>0)&0xff;  
+  sector_buffer[0x1c7]=(sys_partition_start>>8)&0xff;  
+  sector_buffer[0x1c8]=(sys_partition_start>>16)&0xff;  
+  sector_buffer[0x1c9]=(sys_partition_start>>24)&0xff;  
   // LBA size of partition in sectors
-  sector_buffer[0x1ca]=(partition_sectors>>0)&0xff;  
-  sector_buffer[0x1cb]=(partition_sectors>>8)&0xff;  
-  sector_buffer[0x1cc]=(partition_sectors>>16)&0xff;  
-  sector_buffer[0x1cd]=(partition_sectors>>24)&0xff;  
+  sector_buffer[0x1ca]=(sys_partition_sectors>>0)&0xff;  
+  sector_buffer[0x1cb]=(sys_partition_sectors>>8)&0xff;  
+  sector_buffer[0x1cc]=(sys_partition_sectors>>16)&0xff;  
+  sector_buffer[0x1cd]=(sys_partition_sectors>>24)&0xff;  
+  
+  
+  // FAT32 Partition entry
+  sector_buffer[0x1ce]=0x00;  // Not bootable by DOS
+  sector_buffer[0x1cf]=0x00;  // 3 bytes CHS starting point
+  sector_buffer[0x1d0]=0x00;
+  sector_buffer[0x1d1]=0x00;
+  sector_buffer[0x1d2]=0x0c;  // Partition type (VFAT32)
+  sector_buffer[0x1d3]=0x00;  // 3 bytes CHS end point - SHOULD CHANGE WITH DISK SIZE
+  sector_buffer[0x1d4]=0x00;
+  sector_buffer[0x1d5]=0x00;
+  // LBA starting sector of FAT32 partition
+  sector_buffer[0x1d6]=(fat_partition_start>>0)&0xff;  
+  sector_buffer[0x1d7]=(fat_partition_start>>8)&0xff;  
+  sector_buffer[0x1d8]=(fat_partition_start>>16)&0xff;  
+  sector_buffer[0x1d9]=(fat_partition_start>>24)&0xff;  
+  // LBA size of partition in sectors
+  sector_buffer[0x1da]=(fat_partition_sectors>>0)&0xff;  
+  sector_buffer[0x1db]=(fat_partition_sectors>>8)&0xff;  
+  sector_buffer[0x1dc]=(fat_partition_sectors>>16)&0xff;  
+  sector_buffer[0x1dd]=(fat_partition_sectors>>24)&0xff;  
 
   // MBR signature
   sector_buffer[0x1fe]=0x55;
@@ -229,7 +255,8 @@ void build_root_dir(const uint8_t volume_name[11])
 
 uint32_t sdcard_sectors;
 
-uint32_t partition_sectors;
+uint32_t sys_partition_start,sys_partition_sectors;
+uint32_t fat_partition_start,fat_partition_sectors;
 
 // Calculate clusters for file system, and FAT size
 uint32_t fs_clusters=0;
@@ -244,7 +271,7 @@ uint8_t volume_name[11]="M.E.G.A.65!";
 
 // Work out maximum number of clusters we can accommodate
 uint32_t sectors_required;
-uint32_t available_sectors;
+uint32_t fat_available_sectors;
 
 
 #ifdef __CC65__
@@ -265,31 +292,39 @@ int main(int argc,char **argv)
   
   sdcard_sectors = sdcard_getsize();
 
-  // Calculate sectors for partition
-  // This is the size of the card, minus 2,048 (=0x0800) sectors
-  partition_sectors=sdcard_sectors-0x0800;
+  // Calculate sectors for the system and FAT32 partitions.
+  // This is the size of the card, minus 2,048 (=0x0800) sectors.
+  // The system partition should be sized to be not more than 50% of
+  // the SD card, and probably doesn't need to be bigger than 2GB, which would
+  // allow 1GB for 1,024 1MB freeze images and 1,024 1MB service images.
+  // (note that freeze images might end up being a funny size to allow for all
+  // mem plus a D81 image to be saved. This is all to be determined.)
+  // Simple solution for now: Use 1/2 disk for system partition.
+  sys_partition_sectors=(sdcard_sectors-0x0800)>>1;
+  sys_partition_sectors&=0xfffff800; // round down to nearest 1MB boundary
+  fat_partition_sectors=sdcard_sectors-0x800-sys_partition_sectors;
 
-  available_sectors=partition_sectors-reserved_sectors;
+  fat_available_sectors=fat_partition_sectors-reserved_sectors;
 
 #ifndef __CC65__
-  fprintf(stderr,"PARTITION HAS $%x SECTORS ($%x AVAILABLE)\r\n",
-	  partition_sectors,available_sectors);
+  fprintf(stderr,"VFAT32 PARTITION HAS $%x SECTORS ($%x AVAILABLE)\r\n",
+	  fat_partition_sectors,fat_available_sectors);
 #else
   // Tell use how many sectors available for partition
-  write_line("$         Sectors available for partition.",0);
-  screen_hex(screen_line_address-79,partition_sectors);
+  write_line("$         Sectors available for VFAT32 partition.",0);
+  screen_hex(screen_line_address-79,fat_partition_sectors);
 #endif
   
-  fs_clusters=available_sectors/(sectors_per_cluster);
+  fs_clusters=fat_available_sectors/(sectors_per_cluster);
   fat_sectors=fs_clusters/(512/4); if (fs_clusters%(512/4)) fat_sectors++;
   sectors_required=2*fat_sectors+((fs_clusters-2)*sectors_per_cluster);
-  while(sectors_required>available_sectors) {
-    uint32_t excess_sectors=sectors_required-available_sectors;
+  while(sectors_required>fat_available_sectors) {
+    uint32_t excess_sectors=sectors_required-fat_available_sectors;
     uint32_t delta=(excess_sectors/(1+sectors_per_cluster));
     if (delta<1) delta=1;
 #ifndef __CC65__
     fprintf(stderr,"%d clusters would take %d too many sectors.\r\n",
-	    fs_clusters,sectors_required-available_sectors);
+	    fs_clusters,sectors_required-fat_available_sectors);
 #endif
     fs_clusters-=delta;
     fat_sectors=fs_clusters/(512/4); if (fs_clusters%(512/4)) fat_sectors++;
@@ -325,9 +360,10 @@ int main(int argc,char **argv)
   }
 #endif
 
+  sys_partition_start=0x00000800;
+  fat_partition_start=sys_partition_start+sys_partition_sectors;
   
-  
-  fat1_sector=0x0800+reserved_sectors;
+  fat1_sector=fat_partition_start+reserved_sectors;
   fat2_sector=fat1_sector+fat_sectors;
   rootdir_sector=fat2_sector+fat_sectors;
   fs_data_sectors=fs_clusters*sectors_per_cluster;
@@ -337,32 +373,35 @@ int main(int argc,char **argv)
   write_line(" ",0);
   write_line("Writing Partition Table / Master Boot Record...",0);
 #endif
-  build_mbr(partition_sectors);
+  build_mbr(sys_partition_start,
+	    sys_partition_sectors,
+	    fat_partition_start,
+	    fat_partition_sectors);
   sdcard_writesector(0);
 
 #ifdef __CC65__
   write_line("Erasing reserved sectors before partition...",0);
 #endif
   // Blank intervening sectors
-  sdcard_erase(0+1,0x0800-1);
+  sdcard_erase(0+1,sys_partition_start-1);
   
 #ifdef __CC65__
   write_line("Writing FAT Boot Sector...",0);
 #endif
   // Partition starts at fixed position of sector 2048, i.e., 1MB
   build_dosbootsector(volume_name,
-		      partition_sectors,
+		      fat_partition_sectors,
 		      fat_sectors);
-  sdcard_writesector(0x0800);
-  sdcard_writesector(0x0806); // Backup boot sector at partition + 6
+  sdcard_writesector(fat_partition_start);
+  sdcard_writesector(fat_partition_start+6); // Backup boot sector at partition + 6
 
 #ifdef __CC65__
   write_line("Writing FAT Information Block (and backup copy)...",0);
 #endif
   // FAT32 FS Information block (and backup)
   build_fs_information_sector(fs_clusters);
-  sdcard_writesector(0x0801);
-  sdcard_writesector(0x0807);
+  sdcard_writesector(fat_partition_start+1);
+  sdcard_writesector(fat_partition_start+7);
 
   // FATs
 #ifndef __CC65__
@@ -389,8 +428,8 @@ int main(int argc,char **argv)
   write_line("Clearing file system data structures...",0);
 #endif
   // Make sure all other sectors are empty
-  sdcard_erase(0x0801+1,0x0806-1);
-  sdcard_erase(0x0806+1,fat1_sector-1);
+  sdcard_erase(fat_partition_start+1+1,fat_partition_start+6-1);
+  sdcard_erase(fat_partition_start+6+1,fat1_sector-1);
   sdcard_erase(fat1_sector+1,fat2_sector-1);
   sdcard_erase(fat2_sector+1,rootdir_sector-1);
   sdcard_erase(rootdir_sector+1,rootdir_sector+1+sectors_per_cluster-1);
