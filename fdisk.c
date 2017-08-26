@@ -369,6 +369,10 @@ void build_mega65_sys_sector(const uint32_t sys_partition_sectors)
   sector_buffer_write_uint16(0x2c,slot_count);
   // $02e-$02f = Number of sectors in service slot directory
   sector_buffer_write_uint16(0x2e,dir_size);
+
+  // Now make sector numbers relative to start of disk for later use
+  sys_partition_freeze_dir+=sys_partition_start;
+  sys_partition_service_dir+=sys_partition_start;
   
   return;
 }
@@ -491,6 +495,13 @@ int main(int argc,char **argv)
   build_mega65_sys_sector(sys_partition_sectors);
   sdcard_writesector(sys_partition_start);
 
+#ifdef __CC65__
+  write_line("Freeze dir @ $        ",0);
+  screen_hex(screen_line_address-79+14,sys_partition_freeze_dir);
+  write_line("Service dir @ $        ",0);
+  screen_hex(screen_line_address-79+14,sys_partition_service_dir);
+  
+#endif  
   // erase frozen program directory
   sdcard_erase(sys_partition_freeze_dir,
 	       sys_partition_freeze_dir+freeze_dir_sectors-1);
