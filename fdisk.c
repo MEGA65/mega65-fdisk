@@ -457,7 +457,7 @@ int main(int argc,char **argv)
     recolour_last_line(2);
     len=read_line(line_of_input,80);
     if (len) {
-      write_line(line_of_input,3);
+      write_line(line_of_input,0);
       recolour_last_line(7);
     }
     if (strcmp("DELETE EVERYTHING",line_of_input)) {

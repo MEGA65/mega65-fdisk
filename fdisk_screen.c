@@ -206,15 +206,18 @@ char read_line(char *buffer,unsigned char maxlen)
 {
   char len=0;
   char c;
+  char reverse=0;
 
   // Read input using hardware keyboard scanner
-
+  
   while(len<maxlen) {
     c=*(unsigned char *)0xD610;
 
+    reverse ^=0x20;
+    
     // Show cursor
     lpoke(len+screen_line_address+COLOUR_RAM_ADDRESS-SCREEN_ADDRESS,
-	  0x20 ^
+	  reverse |
 	(lpeek(len+screen_line_address+COLOUR_RAM_ADDRESS-SCREEN_ADDRESS)
 	 & 0xf));
 
