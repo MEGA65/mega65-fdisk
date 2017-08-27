@@ -208,8 +208,16 @@ char read_line(char *buffer,unsigned char maxlen)
   char c;
 
   // Read input using hardware keyboard scanner
+
   while(len<maxlen) {
     c=*(unsigned char *)0xD610;
+
+    // Show cursor
+    lpoke(len+screen_line_address+COLOUR_RAM_ADDRESS-SCREEN_ADDRESS,
+	  0x20 ^
+	(lpeek(len+screen_line_address+COLOUR_RAM_ADDRESS-SCREEN_ADDRESS)
+	 & 0xf));
+
     if (c) {
       // Clear key from hardware keyboard scanner
       *(unsigned char *)0xd610=1;
@@ -219,7 +227,14 @@ char read_line(char *buffer,unsigned char maxlen)
 	  buffer[len]=0;
 	  return len;
 	}
-      else buffer[len++]=c;
+      else {
+	lpoke(screen_line_address+len,c);
+	// Remove blink attribute from this char
+	lpoke(len+screen_line_address+COLOUR_RAM_ADDRESS-SCREEN_ADDRESS,
+	      lpeek(len+screen_line_address+COLOUR_RAM_ADDRESS-SCREEN_ADDRESS)
+	      & 0xf);
+	buffer[len++]=c;
+      }
       
       //      *(unsigned char *)0x8000 = c;
     }
