@@ -52,7 +52,12 @@ uint32_t sdcard_getsize(void)
     // If we have a read error, then remove this bit from the mask
     if (result&0x60) {
       // Now mask out bit in sector number, and try again
+      //      write_line("Error reading sector $",0);
+      //      screen_hex(screen_line_address-79+21,sector_number);      
       sector_number-=step;
+    } else {
+      //      write_line("OK reading sector $",0);
+      //      screen_hex(screen_line_address-79+18,sector_number);      
     }
     // Advance half step
     step=step>>1;
@@ -60,6 +65,10 @@ uint32_t sdcard_getsize(void)
     
   }
 
+  // Report number of sectors
+  //  screen_decimal(screen_line_address,sector_number/1024);
+  //  write_line("K Sector SD CARD.",8);  
+  
   // Work out size in MB and tell user
   {
     char col=6;
@@ -68,7 +77,7 @@ uint32_t sdcard_getsize(void)
     if (megs<10000) col=5;
     if (megs<1000) col=4;
     if (megs<100) col=3;
-    write_line("MIB SD CARD FOUND.",col);
+    write_line("MiB SD CARD FOUND.",col);
   }
   
   return sector_number;
