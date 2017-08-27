@@ -338,8 +338,8 @@ void build_mega65_sys_sector(const uint32_t sys_partition_sectors)
   sys_partition_freeze_dir=0;
   sys_partition_service_dir=freeze_dir_sectors+slot_size*slot_count;
   
-  write_line("$         Freeze and OS Service slots.",0);
-  screen_hex(screen_line_address-79,slot_count);
+  write_line("      Freeze and OS Service slots.",0);
+  screen_decimal(screen_line_address-80,slot_count);
   
   
   // Clear sector
@@ -409,15 +409,6 @@ int main(int argc,char **argv)
 
   fat_available_sectors=fat_partition_sectors-reserved_sectors;
 
-#ifndef __CC65__
-  fprintf(stderr,"VFAT32 PARTITION HAS $%x SECTORS ($%x AVAILABLE)\r\n",
-	  fat_partition_sectors,fat_available_sectors);
-#else
-  // Tell use how many sectors available for partition
-  write_line("$         Sectors available for VFAT32 partition.",0);
-  screen_hex(screen_line_address-79,fat_partition_sectors);
-#endif
-  
   fs_clusters=fat_available_sectors/(sectors_per_cluster);
   fat_sectors=fs_clusters/(512/4); if (fs_clusters%(512/4)) fat_sectors++;
   sectors_required=2*fat_sectors+((fs_clusters-2)*sectors_per_cluster);
@@ -434,10 +425,25 @@ int main(int argc,char **argv)
     sectors_required=2*fat_sectors+((fs_clusters-2)*sectors_per_cluster);
   }
 #ifndef __CC65__
+  fprintf(stderr,"VFAT32 PARTITION HAS $%x SECTORS ($%x AVAILABLE)\r\n",
+	  fat_partition_sectors,fat_available_sectors);
+#else
+  // Tell use how many sectors available for partition
+  write_line("$         Sectors available for MEGA65 System partition.",0);
+  screen_hex(screen_line_address-79,sys_partition_sectors);
+  build_mega65_sys_sector(sys_partition_sectors);
+
+  write_line("$         Sectors available for VFAT32 partition.",0);
+  screen_hex(screen_line_address-79,fat_partition_sectors);
+#endif
+  
+#ifndef __CC65__
   fprintf(stderr,"Creating File System with %u (0x%x) CLUSTERS, %d SECTORS PER FAT, %d RESERVED SECTORS.\r\n",
 	  fs_clusters,fs_clusters,fat_sectors,reserved_sectors);
 #else
+  write_line(" ",0);
   write_line("Format SD Card with new partition table and FAT32 file fystem?",0);
+  recolour_last_line(7);
   write_line("  $         Clusters,       Sectors/FAT,       Reserved Sectors.",0);
   screen_hex(screen_line_address-80+3,fs_clusters);
   screen_decimal(screen_line_address-80+22,fat_sectors);
