@@ -41,6 +41,22 @@ void screen_hex(unsigned int addr,long value)
   POKE(addr+7,to_screen_hex(value>>0));
 }
 
+void format_hex(const int addr,const int value, const char columns)
+{
+  char i,c;
+  char dec[9];
+  screen_hex((int)&dec[0],value);
+
+  c=8-columns;
+  while(c) {
+    for(i=0;i<7;i++) dec[i]=dec[i+1];
+    dec[7]=' ';
+    c--;
+  }
+  for(i=0;i<columns;i++) lpoke(addr+i,dec[i]);
+}
+
+
 unsigned char screen_decimal_digits[16][5]={
   {0,0,0,0,1},
   {0,0,0,0,2},
@@ -121,6 +137,16 @@ void screen_decimal(unsigned int addr,unsigned int v)
   for(j=0;j<4;j++) POKE(addr+j,screen_hex_buffer[j]);
 }
 
+void format_decimal(const int addr,const int value, const char columns)
+{
+  char i;
+  char c;
+  char dec[6];
+  screen_decimal((int)&dec[0],value);
+
+  for(i=0;i<columns;i++) lpoke(addr+i,dec[i]);
+}
+
 long addr;
 void display_footer(unsigned char index)
 {  
@@ -162,7 +188,7 @@ void setup_screen(void)
   lfill(0x1f800,0x01,2000);
 
   // Copy ASCII charset into place
-  lcopy(charset,CHARSET_ADDRESS,0x800);
+  lcopy((int)&charset[0],CHARSET_ADDRESS,0x800);
 
   // Set screen line address and write point
   screen_line_address=SCREEN_ADDRESS;

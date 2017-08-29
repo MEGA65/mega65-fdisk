@@ -23,12 +23,7 @@
 #include "fdisk_screen.h"
 #include "ascii.h"
 
-#ifdef __CC65__
-// Sector buffer is the physical SD card buffer on M65 to avoid copying
-uint8_t *sector_buffer=(uint8_t *)0xDE00;
-#else
 uint8_t sector_buffer[512];
-#endif
 
 void clear_sector_buffer(void)
 {
@@ -377,6 +372,59 @@ void build_mega65_sys_sector(const uint32_t sys_partition_sectors)
   return;
 }
 
+void show_partition_entry(const char i)
+{
+  char report[80]="$$* : Start=%%%/%%/%%%% or $$$$$$$$ / End=%%%/%%/%%%% or $$$$$$$$";
+  
+  int offset=0x1be+(i<<4);
+
+  char active=sector_buffer[offset+0];
+  char shead=sector_buffer[offset+1];
+  char ssector=sector_buffer[offset+2]&0x1f;
+  int scylinder=((sector_buffer[offset+2]<<2)&0x300)+sector_buffer[offset+3];
+  char id=sector_buffer[offset+4];
+  char ehead=sector_buffer[offset+5];
+  char esector=sector_buffer[offset+6]&0x1f;
+  int ecylinder=((sector_buffer[offset+6]<<2)&0x300)+sector_buffer[offset+7];
+  uint32_t lba_start
+    =sector_buffer[offset+8]
+    |(sector_buffer[offset+9]<<8)    
+    |((uint32_t)sector_buffer[offset+10]<<16)    
+    |((uint32_t)sector_buffer[offset+11]<<24);    
+  uint32_t lba_end
+    =sector_buffer[offset+12]
+    |(sector_buffer[offset+13]<<8)    
+    |((uint32_t)sector_buffer[offset+14]<<16)    
+    |((uint32_t)sector_buffer[offset+15]<<24);    
+
+  format_hex((int)report+0,id,2);
+  if (!(active&0x80)) report[2]=' '; // not active
+
+  format_decimal((int)report+12,shead,3);
+  format_decimal((int)report+16,ssector,2);
+  format_decimal((int)report+19,scylinder,4);
+  format_hex((int)report+27,lba_start,8);
+
+  format_decimal((int)report+42,ehead,3);
+  format_decimal((int)report+46,esector,2);
+  format_decimal((int)report+49,ecylinder,4);
+  format_hex((int)report+57,lba_end,8);
+
+  write_line(report,0);
+  
+}
+
+void show_mbr(void)
+{
+  char i;
+  
+  sdcard_readsector(0);
+
+  for(i=0;i<4;i++) {
+    show_partition_entry(i);
+  }
+}
+
 #ifdef __CC65__
 void main(void)
 #else
@@ -395,6 +443,9 @@ int main(int argc,char **argv)
   
   sdcard_sectors = sdcard_getsize();
 
+  // Show summary of current MBR
+  show_mbr();
+  
   // Calculate sectors for the system and FAT32 partitions.
   // This is the size of the card, minus 2,048 (=0x0800) sectors.
   // The system partition should be sized to be not more than 50% of
@@ -429,6 +480,7 @@ int main(int argc,char **argv)
 	  fat_partition_sectors,fat_available_sectors);
 #else
   // Tell use how many sectors available for partition
+  write_line(" ",0);
   write_line("$         Sectors available for MEGA65 System partition.",0);
   screen_hex(screen_line_address-79,sys_partition_sectors);
   build_mega65_sys_sector(sys_partition_sectors);
@@ -437,6 +489,14 @@ int main(int argc,char **argv)
   screen_hex(screen_line_address-79,fat_partition_sectors);
 #endif
   
+  sys_partition_start=0x00000800;
+  fat_partition_start=sys_partition_start+sys_partition_sectors;
+  
+  fat1_sector=fat_partition_start+reserved_sectors;
+  fat2_sector=fat1_sector+fat_sectors;
+  rootdir_sector=fat2_sector+fat_sectors;
+  fs_data_sectors=fs_clusters*sectors_per_cluster;
+
 #ifndef __CC65__
   fprintf(stderr,"Creating File System with %u (0x%x) CLUSTERS, %d SECTORS PER FAT, %d RESERVED SECTORS.\r\n",
 	  fs_clusters,fs_clusters,fat_sectors,reserved_sectors);
@@ -444,10 +504,32 @@ int main(int argc,char **argv)
   write_line(" ",0);
   write_line("Format SD Card with new partition table and FAT32 file fystem?",0);
   recolour_last_line(7);
+  {
+    char col=6;
+    int megs=(fat_partition_sectors+1)/2048;
+    screen_decimal(screen_line_address+2,megs);
+    if (megs<10000) col=5;
+    if (megs<1000) col=4;
+    if (megs<100) col=3;
+    if (megs<10) col=2;
+    write_line("MiB VFAT32 Data Partition:",2+col);
+  }
   write_line("  $         Clusters,       Sectors/FAT,       Reserved Sectors.",0);
   screen_hex(screen_line_address-80+3,fs_clusters);
   screen_decimal(screen_line_address-80+22,fat_sectors);
   screen_decimal(screen_line_address-80+41,reserved_sectors);
+
+  {
+    char col=6;
+    int megs=(sys_partition_sectors+1)/2048;
+    screen_decimal(2+screen_line_address,megs/2048);
+    if (megs<10000) col=5;
+    if (megs<1000) col=4;
+    if (megs<100) col=3;
+    if (megs<10) col=2;
+    write_line("MiB MEGA65 System Partition:",2+col);
+  }
+
   while(1)
   {
     char line_of_input[80];
@@ -468,14 +550,6 @@ int main(int argc,char **argv)
       break;
   }
 #endif
-
-  sys_partition_start=0x00000800;
-  fat_partition_start=sys_partition_start+sys_partition_sectors;
-  
-  fat1_sector=fat_partition_start+reserved_sectors;
-  fat2_sector=fat1_sector+fat_sectors;
-  rootdir_sector=fat2_sector+fat_sectors;
-  fs_data_sectors=fs_clusters*sectors_per_cluster;
   
   // MBR is always the first sector of a disk
 #ifdef __CC65__

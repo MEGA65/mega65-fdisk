@@ -9,7 +9,7 @@
 #define POKE(X,Y) (*(unsigned char*)(X))=Y
 #define PEEK(X) (*(unsigned char*)(X))
 
-long sd_sectorbuffer=0xde00L;
+long sd_sectorbuffer=0xffd6000;
 uint16_t sd_ctl=0xd680L;
 uint16_t sd_addr=0xd681L;
 
@@ -37,15 +37,8 @@ uint32_t sdcard_getsize(void)
 
     // Work out address of sector
     // XXX - Assumes SD, not SDHC card
-    sector_address=sector_number*512;    
-    POKE(sd_addr+0,(sector_address>>0)&0xff);
-    POKE(sd_addr+1,(sector_address>>8)&0xff);
-    POKE(sd_addr+2,(sector_address>>16)&0xff);
-    POKE(sd_addr+3,(sector_address>>24)&0xff);
+    sdcard_readsector(sector_number);
     
-    // Command read
-    POKE(sd_ctl,2);
-
     // Note result
     result=PEEK(sd_ctl);
 
@@ -73,7 +66,7 @@ uint32_t sdcard_getsize(void)
   {
     char col=6;
     int megs=(sector_number+1)/2048;
-    screen_decimal(screen_line_address,(sector_number+1)/2048);
+    screen_decimal(screen_line_address,megs);
     if (megs<10000) col=5;
     if (megs<1000) col=4;
     if (megs<100) col=3;
@@ -104,6 +97,49 @@ void sdcard_unmap_sector_buffer(void)
   POKE(sd_ctl,0x82);
 }
 
+void sdcard_readsector(const uint32_t sector_number)
+{
+  char tries=0;
+  int i;
+  
+  uint32_t sector_address=sector_number*512;    
+  POKE(sd_addr+0,(sector_address>>0)&0xff);
+  POKE(sd_addr+1,(sector_address>>8)&0xff);
+  POKE(sd_addr+2,((uint32_t)sector_address>>16)&0xff);
+  POKE(sd_addr+3,((uint32_t)sector_address>>24)&0xff);
+
+  while(tries<10) {
+  
+    // Wait for SD card to be ready
+    while (PEEK(sd_ctl)&3)
+      continue;
+    
+    // Command read
+    POKE(sd_ctl,2);
+    
+    // Wait for read to complete
+    while (PEEK(sd_ctl)&3)
+      continue;
+    
+      // Note result
+    // result=PEEK(sd_ctl);
+
+    if (!(PEEK(sd_ctl)&0xe7)) {
+      // Copy data from hardware sector buffer via DMA
+      lcopy(sd_sectorbuffer,(long)sector_buffer,512);
+  
+      return;
+    }
+
+    POKE(0xd020,(PEEK(0xd020)+1)&0xf);
+    // Wait a bit first for SD card to get happy
+    for(i=0;i<1000000;i++) continue;
+  }
+
+
+  
+}
+
 void sdcard_writesector(const uint32_t sector_number)
 {
   // Copy buffer into the SD card buffer, and then execute the write job
@@ -116,6 +152,9 @@ void sdcard_writesector(const uint32_t sector_number)
   POKE(sd_addr+2,(sector_address>>16)&0xff);
   POKE(sd_addr+3,(sector_address>>24)&0xff);
 
+  // Copy data to hardware sector buffer via DMA
+  lcopy((long)sector_buffer,sd_sectorbuffer,512);
+  
   // Give write command
   POKE(sd_ctl,0x03);
     

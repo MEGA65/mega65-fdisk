@@ -52,6 +52,9 @@ void write_line(char *s,char col);
 void recolour_last_line(char colour);
 char read_line(char *buffer,char maxlen);
 
+void format_decimal(const int addr,const int value, const char columns);
+void format_hex(const int addr,const int value, const char columns);
+
 extern long screen_line_address;
 
 extern unsigned char ascii_map[256];
