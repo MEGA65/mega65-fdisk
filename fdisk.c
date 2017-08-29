@@ -374,6 +374,7 @@ void build_mega65_sys_sector(const uint32_t sys_partition_sectors)
 
 void show_partition_entry(const char i)
 {
+  char j;
   char report[80]="$$* : Start=%%%/%%/%%%% or $$$$$$$$ / End=%%%/%%/%%%% or $$$$$$$$";
   
   int offset=0x1be+(i<<4);
@@ -386,17 +387,11 @@ void show_partition_entry(const char i)
   char ehead=sector_buffer[offset+5];
   char esector=sector_buffer[offset+6]&0x1f;
   int ecylinder=((sector_buffer[offset+6]<<2)&0x300)+sector_buffer[offset+7];
-  uint32_t lba_start
-    =sector_buffer[offset+8]
-    |(sector_buffer[offset+9]<<8)    
-    |((uint32_t)sector_buffer[offset+10]<<16)    
-    |((uint32_t)sector_buffer[offset+11]<<24);    
-  uint32_t lba_end
-    =sector_buffer[offset+12]
-    |(sector_buffer[offset+13]<<8)    
-    |((uint32_t)sector_buffer[offset+14]<<16)    
-    |((uint32_t)sector_buffer[offset+15]<<24);    
+  uint32_t lba_start,lba_end;
 
+  for(j=0;j<4;j++) ((char *)&lba_start)[j]=sector_buffer[offset+8+j];
+  for(j=0;j<4;j++) ((char *)&lba_end)[j]=sector_buffer[offset+12+j];
+  
   format_hex((int)report+0,id,2);
   if (!(active&0x80)) report[2]=' '; // not active
 
@@ -512,7 +507,8 @@ int main(int argc,char **argv)
     if (megs<1000) col=4;
     if (megs<100) col=3;
     if (megs<10) col=2;
-    write_line("MiB VFAT32 Data Partition:",2+col);
+    write_line("MiB VFAT32 Data Partition @ $$$$$$$$:",2+col);
+    screen_hex(screen_line_address-80+28+2+col,fat_partition_start);
   }
   write_line("  $         Clusters,       Sectors/FAT,       Reserved Sectors.",0);
   screen_hex(screen_line_address-80+3,fs_clusters);
@@ -522,12 +518,13 @@ int main(int argc,char **argv)
   {
     char col=6;
     int megs=(sys_partition_sectors+1)/2048;
-    screen_decimal(2+screen_line_address,megs/2048);
+    screen_decimal(2+screen_line_address,megs);
     if (megs<10000) col=5;
     if (megs<1000) col=4;
     if (megs<100) col=3;
     if (megs<10) col=2;
-    write_line("MiB MEGA65 System Partition:",2+col);
+    write_line("MiB MEGA65 System Partition @ $$$$$$$$:",2+col);
+    screen_hex(screen_line_address-80+30+2+col,sys_partition_start);
   }
 
   while(1)
