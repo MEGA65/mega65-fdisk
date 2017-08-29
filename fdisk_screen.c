@@ -82,6 +82,13 @@ void write_line(char *s,char col)
   while(s[len]) len++;
   lcopy((long)&s[0],screen_line_address+col,len);
   screen_line_address+=80;
+  if ((screen_line_address-SCREEN_ADDRESS)>=(24*80)) {
+    screen_line_address-=80;
+    lcopy(SCREEN_ADDRESS+80,SCREEN_ADDRESS,23*80);
+    lcopy(COLOUR_RAM_ADDRESS+80,COLOUR_RAM_ADDRESS,23*80);
+    lfill(SCREEN_ADDRESS+23*80,' ',80);
+    lfill(COLOUR_RAM_ADDRESS+23*80,1,80);
+  }
 }
 
 void recolour_last_line(char colour)
