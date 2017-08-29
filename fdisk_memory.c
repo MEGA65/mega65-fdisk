@@ -21,15 +21,15 @@ struct dmagic_dmalist {
 struct dmagic_dmalist dmalist;
 unsigned char dma_byte;
 
-void do_dma(void)
+void do_dma(long source_address,long destination_address)
 {
   m65_io_enable();
   
   // Now run DMA job (to and from low 1MB, and list is in low 1MB)
   POKE(0xd702U,0);
   POKE(0xd704U,0);
-  POKE(0xd705U,0);
-  POKE(0xd706U,0);
+  POKE(0xd705U,source_address>>20);
+  POKE(0xd706U,destination_address>>20);
   POKE(0xd701U,((unsigned int)&dmalist)>>8);
   POKE(0xd700U,((unsigned int)&dmalist)&0xff); // triggers DMA
 }
@@ -47,7 +47,7 @@ unsigned char lpeek(long address)
   dmalist.dest_addr=(unsigned int)&dma_byte;
   dmalist.dest_bank=0;
 
-  do_dma();
+  do_dma(address,0);
    
   return dma_byte;
 }
@@ -62,7 +62,7 @@ void lpoke(long address, unsigned char value)
   dmalist.dest_addr=address&0xffff;
   dmalist.dest_bank=(address>>16)&0x7f;
 
-  do_dma(); 
+  do_dma(0,address); 
   return;
 }
 
@@ -80,7 +80,7 @@ void lcopy(long source_address, long destination_address,
   if (destination_address>=0xd000 && destination_address<0xe000)
     dmalist.dest_bank|=0x80;
 
-  do_dma();
+  do_dma(source_address,destination_address);
   return;
 }
 
@@ -95,7 +95,7 @@ void lfill(long destination_address, unsigned char value,
   if (destination_address>=0xd000 && destination_address<0xe000)
     dmalist.dest_bank|=0x80;
 
-  do_dma();
+  do_dma(0,destination_address);
   return;
 }
 
