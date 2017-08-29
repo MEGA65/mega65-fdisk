@@ -415,6 +415,8 @@ void show_mbr(void)
   
   sdcard_readsector(0);
 
+  write_line(" ",0);
+  write_line("Current partition table:",0);
   for(i=0;i<4;i++) {
     show_partition_entry(i);
   }
