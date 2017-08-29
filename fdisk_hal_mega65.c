@@ -144,6 +144,8 @@ void sdcard_writesector(const uint32_t sector_number)
 {
   // Copy buffer into the SD card buffer, and then execute the write job
   uint32_t sector_address;
+  int i;
+  char tries=0;
   
   // Set address to read/write
   sector_address=sector_number*512;
@@ -155,12 +157,48 @@ void sdcard_writesector(const uint32_t sector_number)
   // Copy data to hardware sector buffer via DMA
   lcopy((long)sector_buffer,sd_sectorbuffer,512);
   
-  // Give write command
-  POKE(sd_ctl,0x03);
+  while(tries<10) {
+  
+    // Wait for SD card to be ready
+    while (PEEK(sd_ctl)&3)
+      continue;
     
-  write_count++;
+    // Command write
+    POKE(sd_ctl,3);
+    
+    // Wait for read to complete
+    while (PEEK(sd_ctl)&3)
+      {
+	write_count++;
+      
+	POKE(0xD020,write_count&0xff);
+      }
+    
+      // Note result
+    // result=PEEK(sd_ctl);
 
-  POKE(0xD020,write_count&0xff);
+    if (!(PEEK(sd_ctl)&0xe7)) {
+      write_count++;
+      
+      POKE(0xD020,write_count&0xff);
+      
+      write_line("Wrote sector $$$$$$$$",2);      
+      screen_hex(screen_line_address-80+2+14,sector_number);
+      return;
+    }
+
+    POKE(0xd020,(PEEK(0xd020)+1)&0xf);
+    // Wait a bit first for SD card to get happy
+    for(i=0;i<32000;i++) continue;
+  }
+
+  write_line("Write error @ $$$$$$$$$",2);      
+  screen_hex(screen_line_address-80+2+16,sector_number);
+  {
+    long i;
+    for(i=0;i<100000;i++) continue;
+  }
+  
 }
 
 void sdcard_erase(const uint32_t first_sector,const uint32_t last_sector)

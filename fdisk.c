@@ -486,10 +486,10 @@ int main(int argc,char **argv)
   screen_hex(screen_line_address-79,fat_partition_sectors);
 #endif
   
-  sys_partition_start=0x00000800;
-  fat_partition_start=sys_partition_start+sys_partition_sectors;
+  fat_partition_start=0x00000800;
+  sys_partition_start=fat_partition_start+fat_partition_sectors;
   
-  fat1_sector=fat_partition_start+reserved_sectors;
+  fat1_sector=reserved_sectors;
   fat2_sector=fat1_sector+fat_sectors;
   rootdir_sector=fat2_sector+fat_sectors;
   fs_data_sectors=fs_clusters*sectors_per_cluster;
@@ -562,11 +562,12 @@ int main(int argc,char **argv)
   sdcard_writesector(0);
 
 #ifdef __CC65__
-  write_line("Erasing reserved sectors before first partition...",0);
+  // write_line("Erasing reserved sectors before first partition...",0);
 #endif
   // Blank intervening sectors
-  sdcard_erase(0+1,sys_partition_start-1);
+  //  sdcard_erase(0+1,sys_partition_start-1);
 
+  if (0) {
   // Write MEGA65 System partition header sector
 #ifdef __CC65__
   write_line("Writing MEGA65 System Partition header sector...",0);
@@ -580,15 +581,17 @@ int main(int argc,char **argv)
   write_line("Service dir @ $        ",0);
   screen_hex(screen_line_address-79+14,sys_partition_service_dir);
   
-#endif  
-  // erase frozen program directory
+#endif
+  // erase frozen program directory  
   sdcard_erase(sys_partition_freeze_dir,
 	       sys_partition_freeze_dir+freeze_dir_sectors-1);
-
+  
   // erase system service image directory
   sdcard_erase(sys_partition_service_dir,
 	       sys_partition_service_dir+service_dir_sectors-1);
-  
+
+  }
+    
 #ifdef __CC65__
   write_line("Writing FAT Boot Sector...",0);
 #endif
@@ -617,15 +620,15 @@ int main(int argc,char **argv)
   screen_hex(screen_line_address-80+31,fat2_sector*512);
 #endif
   build_empty_fat(); 
-  sdcard_writesector(fat1_sector);
-  sdcard_writesector(fat2_sector);
+  sdcard_writesector(fat_partition_start+fat1_sector);
+  sdcard_writesector(fat_partition_start+fat2_sector);
 
 #ifdef __CC65__
   write_line("Writing Root Directory...",0);
 #endif
   // Root directory
   build_root_dir(volume_name);
-  sdcard_writesector(rootdir_sector);
+  sdcard_writesector(fat_partition_start+rootdir_sector);
 
 #ifdef __CC65__
   write_line(" ",0);
@@ -633,10 +636,10 @@ int main(int argc,char **argv)
 #endif
   // Make sure all other sectors are empty
   sdcard_erase(fat_partition_start+1+1,fat_partition_start+6-1);
-  sdcard_erase(fat_partition_start+6+1,fat1_sector-1);
-  sdcard_erase(fat1_sector+1,fat2_sector-1);
-  sdcard_erase(fat2_sector+1,rootdir_sector-1);
-  sdcard_erase(rootdir_sector+1,rootdir_sector+1+sectors_per_cluster-1);
+  sdcard_erase(fat_partition_start+6+1,fat_partition_start+fat1_sector-1);
+  sdcard_erase(fat_partition_start+fat1_sector+1,fat_partition_start+fat2_sector-1);
+  sdcard_erase(fat_partition_start+fat2_sector+1,fat_partition_start+rootdir_sector-1);
+  sdcard_erase(fat_partition_start+rootdir_sector+1,fat_partition_start+rootdir_sector+1+sectors_per_cluster-1);
 
 #ifdef __CC65__
   POKE(0xd021U,6);
