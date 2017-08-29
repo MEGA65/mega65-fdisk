@@ -15,6 +15,7 @@ struct dmagic_dmalist {
   unsigned char source_bank;
   unsigned int dest_addr;
   unsigned char dest_bank;
+  unsigned char sub_cmd;  // F018B subcmd
   unsigned int modulo;
 };
 
@@ -25,7 +26,8 @@ void do_dma(long source_address,long destination_address)
 {
   m65_io_enable();
   
-  // Now run DMA job (to and from low 1MB, and list is in low 1MB)
+  // Now run DMA job (to and from anywhere, and list is in low 1MB)
+  POKE(0xd703U,1); // enable F018B mode
   POKE(0xd702U,0);
   POKE(0xd704U,0);
   POKE(0xd705U,source_address>>20);
@@ -71,12 +73,13 @@ void lcopy(long source_address, long destination_address,
 {
   dmalist.command=0x00; // copy
   dmalist.count=count;
+  dmalist.sub_cmd=0;
   dmalist.source_addr=source_address&0xffff;
-  dmalist.source_bank=(source_address>>16)&0x7f;
+  dmalist.source_bank=(source_address>>16)&0x0f;
   if (source_address>=0xd000 && source_address<0xe000)
     dmalist.source_bank|=0x80;  
   dmalist.dest_addr=destination_address&0xffff;
-  dmalist.dest_bank=(destination_address>>16)&0x7f;
+  dmalist.dest_bank=(destination_address>>16)&0x0f;
   if (destination_address>=0xd000 && destination_address<0xe000)
     dmalist.dest_bank|=0x80;
 
@@ -88,6 +91,7 @@ void lfill(long destination_address, unsigned char value,
 	  unsigned int count)
 {
   dmalist.command=0x03; // fill
+  dmalist.sub_cmd=0;
   dmalist.count=count;
   dmalist.source_addr=value;
   dmalist.dest_addr=destination_address&0xffff;
