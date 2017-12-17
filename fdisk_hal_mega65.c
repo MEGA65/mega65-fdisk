@@ -16,6 +16,19 @@ uint16_t sd_addr=0xd681L;
 // Tell utilpacker what our display name is
 const char *prop_m65u_name="PROP.M65U.NAME=SDCARD FDISK+FORMAT UTILITY";
 
+void usleep(uint32_t micros)
+{
+  // Sleep for desired number of micro-seconds.
+  // Each VIC-II raster line is ~64 microseconds
+  // this is not totally accurate, but is a reasonable approach
+  while(micros>64) {    
+    uint8_t b=PEEK(0xD012);
+    while(PEEK(0xD011)==b) continue;
+    micros-=64;
+  }
+  return;
+}
+
 void mega65_fast(void)
 {
   POKE(0,65);
@@ -145,9 +158,11 @@ void sdcard_writesector(const uint32_t sector_number)
   // Copy buffer into the SD card buffer, and then execute the write job
   uint32_t sector_address;
   int i;
-  char tries=0;
+  char tries=0,result;
+  uint16_t counter=0;
   
   // Set address to read/write
+  POKE(sd_ctl,1); // end reset
   sector_address=sector_number*512;
   POKE(sd_addr+0,(sector_address>>0)&0xff);
   POKE(sd_addr+1,(sector_address>>8)&0xff);
@@ -158,36 +173,69 @@ void sdcard_writesector(const uint32_t sector_number)
   lcopy((long)sector_buffer,sd_sectorbuffer,512);
   
   while(tries<10) {
-  
+
     // Wait for SD card to be ready
+    counter=0;
     while (PEEK(sd_ctl)&3)
-      continue;
+      {
+	counter++;
+	if (!counter) {
+	  // SD card not becoming ready: try reset
+	  POKE(sd_ctl,0); // begin reset
+	  usleep(500000);
+	  POKE(sd_ctl,1); // end reset
+	  POKE(sd_ctl,3); // retry write
+
+	}
+	// Show we are doing something
+	POKE(0x804f,1+(PEEK(0x804f)&0x7f));
+      }
     
     // Command write
     POKE(sd_ctl,3);
     
-    // Wait for read to complete
+    // Wait for write to complete
+    counter=0;
     while (PEEK(sd_ctl)&3)
       {
-	write_count++;
-      
-	POKE(0xD020,write_count&0xff);
+	counter++;
+	if (!counter) {
+	  // SD card not becoming ready: try reset
+	  POKE(sd_ctl,0); // begin reset
+	  usleep(500000);
+	  POKE(sd_ctl,1); // end reset
+	  POKE(sd_ctl,3); // retry write
+
+	}
+	// Show we are doing something
+	POKE(0x809f,1+(PEEK(0x809f)&0x7f));
       }
+
+    write_count++;
+    POKE(0xD020,write_count&0xff);
     
-      // Note result
-    // result=PEEK(sd_ctl);
+    // Note result
+    result=PEEK(sd_ctl);
 
     if (!(PEEK(sd_ctl)&0xe7)) {
       write_count++;
       
       POKE(0xD020,write_count&0xff);
-      
-      write_line("Wrote sector $$$$$$$$",2);      
+
+      // There is a bug in the SD controller: You have to read between writes, or it
+      // gets really upset.
+      POKE(sd_ctl,2); // read the sector we just wrote
+      while (PEEK(sd_ctl)&3) continue;
+            
+      write_line("Wrote sector $$$$$$$$, result=$$",2);      
       screen_hex(screen_line_address-80+2+14,sector_number);
+      screen_hex(screen_line_address-80+2+24,result);
+
       return;
     }
 
     POKE(0xd020,(PEEK(0xd020)+1)&0xf);
+
     // Wait a bit first for SD card to get happy
     for(i=0;i<32000;i++) continue;
   }
