@@ -239,26 +239,44 @@ char read_line(char *buffer,unsigned char maxlen)
 {
   char len=0;
   char c;
-  char reverse=0;
+  char reverse=0x90;
 
   // Read input using hardware keyboard scanner
   
   while(len<maxlen) {
     c=*(unsigned char *)0xD610;
 
+#if 0
     reverse ^=0x20;
+#endif
     
     // Show cursor
     lpoke(len+screen_line_address+COLOUR_RAM_ADDRESS-SCREEN_ADDRESS,
 	  reverse |
 	(lpeek(len+screen_line_address+COLOUR_RAM_ADDRESS-SCREEN_ADDRESS)
 	 & 0xf));
-
+    
     if (c) {
-      // Clear key from hardware keyboard scanner
-      *(unsigned char *)0xd610=1;
 
-      if (c==0x0d)
+      if (c==0x14) {
+	// DELETE
+	if (len) {
+	  // Remove blink attribute from this char
+	  lpoke(len+screen_line_address+COLOUR_RAM_ADDRESS-SCREEN_ADDRESS,
+		lpeek(len+screen_line_address+COLOUR_RAM_ADDRESS-SCREEN_ADDRESS)
+		& 0xf);
+
+	  // Go back one and erase
+	  len--;
+	  lpoke(screen_line_address+len,' ');
+
+	  // Re-enable blink for cursor
+	  lpoke(len+screen_line_address+COLOUR_RAM_ADDRESS-SCREEN_ADDRESS,
+		lpeek(len+screen_line_address+COLOUR_RAM_ADDRESS-SCREEN_ADDRESS)
+		| reverse);
+	  buffer[len]=0;
+	}
+      } else if (c==0x0d)
 	{
 	  buffer[len]=0;
 	  return len;
@@ -273,6 +291,17 @@ char read_line(char *buffer,unsigned char maxlen)
       }
       
       //      *(unsigned char *)0x8000 = c;
+
+      // Clear keys from hardware keyboard scanner
+      // XXX we clear all keys here, and work around a bug that causes crazy
+      // fast key repeating. This can be turned back into acknowledging the
+      // single key again later
+      while (*(unsigned char *)0xD610) {
+	unsigned int i;
+	*(unsigned char *)0xd610=1;
+      
+	for(i=0;i<25000;i++) continue;
+      }
     }
   }
 
