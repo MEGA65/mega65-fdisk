@@ -188,7 +188,7 @@ void sdcard_writesector(const uint32_t sector_number)
 
 	}
 	// Show we are doing something
-	POKE(0x804f,1+(PEEK(0x804f)&0x7f));
+	//	POKE(0x804f,1+(PEEK(0x804f)&0x7f));
       }
     
     // Command write
@@ -208,7 +208,7 @@ void sdcard_writesector(const uint32_t sector_number)
 
 	}
 	// Show we are doing something
-	POKE(0x809f,1+(PEEK(0x809f)&0x7f));
+	//	POKE(0x809f,1+(PEEK(0x809f)&0x7f));
       }
 
     write_count++;
@@ -227,9 +227,9 @@ void sdcard_writesector(const uint32_t sector_number)
       POKE(sd_ctl,2); // read the sector we just wrote
       while (PEEK(sd_ctl)&3) continue;
             
-      write_line("Wrote sector $$$$$$$$, result=$$",2);      
-      screen_hex(screen_line_address-80+2+14,sector_number);
-      screen_hex(screen_line_address-80+2+24,result);
+      //      write_line("Wrote sector $$$$$$$$, result=$$",2);      
+      //      screen_hex(screen_line_address-80+2+14,sector_number);
+      //      screen_hex(screen_line_address-80+2+24,result);
 
       return;
     }
