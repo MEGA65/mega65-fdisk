@@ -590,11 +590,11 @@ int main(int argc,char **argv)
 #endif
 
   // Erase 1MB reserved area
-  write_line("Erasing configuration area");
+  write_line("Erasing configuration area",0);
   sdcard_erase(sys_partition_start+1,sys_partition_start+1023);
   
   // erase frozen program directory  
-  write_line("Erasing frozen program and system service directories");
+  write_line("Erasing frozen program and system service directories",0);
   sdcard_erase(sys_partition_freeze_dir,
 	       sys_partition_freeze_dir+freeze_dir_sectors-1);
   
