@@ -236,10 +236,10 @@ void sdcard_writesector(const uint32_t sector_number)
 
       // Does it just need some time between accesses?
       
-      POKE(sd_ctl,2); // read the sector we just wrote
-      while (PEEK(sd_ctl)&3) {
-	continue;
-      }
+      //      POKE(sd_ctl,2); // read the sector we just wrote
+      //      while (PEEK(sd_ctl)&3) {
+      //	continue;
+      //      }
 
       if (0) {
 	write_line("Wrote sector $$$$$$$$, result=$$",2);      
