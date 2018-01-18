@@ -322,7 +322,9 @@ void build_mega65_sys_sector(const uint32_t sys_partition_sectors)
   */
   uint16_t i;
   uint32_t slot_size=320*1024/512;
-  uint32_t slot_count=sys_partition_sectors/(641*1024/512);
+  // Take 1MB from partition size, for reserved space when
+  // calculating what can fit.
+  uint32_t slot_count=(sys_partition_sectors-2048)/(641*1024/512);
   uint16_t dir_size;
 
   if (slot_count>0xffff) slot_count=0xffff;
@@ -330,8 +332,12 @@ void build_mega65_sys_sector(const uint32_t sys_partition_sectors)
 
   freeze_dir_sectors=dir_size;
   service_dir_sectors=dir_size;
-  sys_partition_freeze_dir=0;
-  sys_partition_service_dir=freeze_dir_sectors+slot_size*slot_count;
+
+  // Freeze directory begins at 1MB
+  sys_partition_freeze_dir=1024*1024;
+  // System service directory begins after that
+  sys_partition_service_dir=
+    sys_partition_freeze_dir+slot_size*slot_count;
   
   write_line("      Freeze and OS Service slots.",0);
   screen_decimal(screen_line_address-80,slot_count);
@@ -567,7 +573,7 @@ int main(int argc,char **argv)
   // Blank intervening sectors
   //  sdcard_erase(0+1,sys_partition_start-1);
 
-  if (0) {
+  if (1) {
   // Write MEGA65 System partition header sector
 #ifdef __CC65__
   write_line("Writing MEGA65 System Partition header sector...",0);
@@ -582,7 +588,13 @@ int main(int argc,char **argv)
   screen_hex(screen_line_address-79+14,sys_partition_service_dir);
   
 #endif
+
+  // Erase 1MB reserved area
+  write_line("Erasing configuration area");
+  sdcard_erase(sys_partition_start+1,sys_partition_start+1023);
+  
   // erase frozen program directory  
+  write_line("Erasing frozen program and system service directories");
   sdcard_erase(sys_partition_freeze_dir,
 	       sys_partition_freeze_dir+freeze_dir_sectors-1);
   
