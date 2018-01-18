@@ -582,7 +582,7 @@ int main(int argc,char **argv)
   sdcard_writesector(sys_partition_start);
 
 #ifdef __CC65__
-  write_line("Freeze dir @ $        ",0);
+  write_line("Freeze  dir @ $        ",0);
   screen_hex(screen_line_address-79+14,sys_partition_freeze_dir);
   write_line("Service dir @ $        ",0);
   screen_hex(screen_line_address-79+14,sys_partition_service_dir);
