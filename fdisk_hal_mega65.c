@@ -91,7 +91,20 @@ uint32_t sdcard_getsize(void)
 
 void sdcard_open(void)
 {
-  // On real MEGA65, there is nothing to do here.
+  // Reset and release reset
+
+  // Command read
+  POKE(sd_ctl,0);
+  {
+    long i;
+    for(i=0;i<50000;i++);
+  }
+  POKE(sd_ctl,1);
+  {
+    long i;
+    for(i=0;i<50000;i++);
+  }
+  
 }
 
 uint32_t write_count=0;
@@ -114,15 +127,17 @@ void sdcard_readsector(const uint32_t sector_number)
 {
   char tries=0;
   int i;
+
   
   uint32_t sector_address=sector_number*512;    
+
   POKE(sd_addr+0,(sector_address>>0)&0xff);
   POKE(sd_addr+1,(sector_address>>8)&0xff);
   POKE(sd_addr+2,((uint32_t)sector_address>>16)&0xff);
   POKE(sd_addr+3,((uint32_t)sector_address>>24)&0xff);
 
   while(tries<10) {
-  
+
     // Wait for SD card to be ready
     while (PEEK(sd_ctl)&3)
       continue;
