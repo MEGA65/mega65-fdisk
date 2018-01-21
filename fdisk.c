@@ -324,7 +324,8 @@ void build_mega65_sys_sector(const uint32_t sys_partition_sectors)
   uint32_t slot_size=320*1024/512;
   // Take 1MB from partition size, for reserved space when
   // calculating what can fit.
-  uint32_t slot_count=(sys_partition_sectors-2048)/(641*1024/512);
+  uint32_t reserved_sectors=1024*1024/512;
+  uint32_t slot_count=(sys_partition_sectors-reserved_sectors)/(641*1024/512);
   uint16_t dir_size;
 
   if (slot_count>0xffff) slot_count=0xffff;
@@ -334,7 +335,7 @@ void build_mega65_sys_sector(const uint32_t sys_partition_sectors)
   service_dir_sectors=dir_size;
 
   // Freeze directory begins at 1MB
-  sys_partition_freeze_dir=1024*1024;
+  sys_partition_freeze_dir=reserved_sectors;
   // System service directory begins after that
   sys_partition_service_dir=
     sys_partition_freeze_dir+slot_size*slot_count;

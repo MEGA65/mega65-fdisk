@@ -215,10 +215,11 @@ void sdcard_writesector(const uint32_t sector_number)
     POKE(0xD020,write_count&0xff);
 
     // Delay a while to work around SD controller bug
-  {
-    long i;
-    for(i=0;i<100;i++) continue;
-  }
+    if (0)
+      {
+	long i;
+	for(i=0;i<100000;i++) continue;
+      }
     
     
     // Note result
@@ -236,12 +237,12 @@ void sdcard_writesector(const uint32_t sector_number)
 
       // Does it just need some time between accesses?
       
-      //      POKE(sd_ctl,2); // read the sector we just wrote
-      //      while (PEEK(sd_ctl)&3) {
-      //	continue;
-      //      }
+      POKE(sd_ctl,2); // read the sector we just wrote
+      while (PEEK(sd_ctl)&3) {
+      	continue;
+      }
 
-      if (0) {
+      if (1) {
 	write_line("Wrote sector $$$$$$$$, result=$$",2);      
 	screen_hex(screen_line_address-80+2+14,sector_number);
 	screen_hex(screen_line_address-80+2+24,result);
