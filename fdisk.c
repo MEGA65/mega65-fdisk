@@ -21,6 +21,7 @@
 #include "fdisk_hal.h"
 #include "fdisk_memory.h"
 #include "fdisk_screen.h"
+#include "fdisk_fat32.h"
 #include "ascii.h"
 
 uint8_t sector_buffer[512];
@@ -648,12 +649,43 @@ int main(int argc,char **argv)
   write_line("Clearing file system data structures...",0);
 #endif
   // Make sure all other sectors are empty
-  sdcard_erase(fat_partition_start+1+1,fat_partition_start+6-1);
-  sdcard_erase(fat_partition_start+6+1,fat_partition_start+fat1_sector-1);
-  sdcard_erase(fat_partition_start+fat1_sector+1,fat_partition_start+fat2_sector-1);
-  sdcard_erase(fat_partition_start+fat2_sector+1,fat_partition_start+rootdir_sector-1);
-  sdcard_erase(fat_partition_start+rootdir_sector+1,fat_partition_start+rootdir_sector+1+sectors_per_cluster-1);
+#if 1
+    sdcard_erase(fat_partition_start+1+1,fat_partition_start+6-1);
+    sdcard_erase(fat_partition_start+6+1,fat_partition_start+fat1_sector-1);
+    sdcard_erase(fat_partition_start+fat1_sector+1,fat_partition_start+fat2_sector-1);
+    sdcard_erase(fat_partition_start+fat2_sector+1,fat_partition_start+rootdir_sector-1);
+    sdcard_erase(fat_partition_start+rootdir_sector+1,fat_partition_start+rootdir_sector+1+sectors_per_cluster-1);
+#endif
 
+  // Write current rom to MEGA65.ROM on the FAT32 file system
+  // (This is as a convenience during development, where I end up formatting the SD card a lot, and it is a pain
+  // to have to remove the SD card to put the ROM back on each time)
+  if ((lpeek(0x2A004L)=='C')&&(lpeek(0x2A005L)=='B')&&(lpeek(0x2A006L)=='M'))
+    {
+      unsigned long first_sector;
+      write_line("Writing current loaded ROM to FAT32 file system",0);
+      first_sector=fat32_create_contiguous_file("MEGA65  ROM",0x20000L,
+						fat_partition_start+rootdir_sector,
+						fat_partition_start+fat1_sector,
+						fat_partition_start+fat2_sector);
+      if (first_sector) {
+	// Write out ROM sectors
+	unsigned long addr;
+	for(addr=0x20000;addr<=0x40000;addr+=512)
+	  {
+	    lcopy(addr,sector_buffer,512);
+	    sdcard_writesector(first_sector+(addr-0x20000)/512);
+	  }
+	write_line("Completed writing ROM",0);
+      }
+    } else {
+    write_line("No ROM currently loaded (SIG=$$$$$$$).",0);
+    screen_hex_byte(screen_line_address-80+30,lpeek(0x2a004));
+    screen_hex_byte(screen_line_address-80+32,lpeek(0x2a005));
+    screen_hex_byte(screen_line_address-80+34,lpeek(0x2a006));
+  }
+  
+  
 #ifdef __CC65__
   POKE(0xd021U,6);
   write_line(" ",0);

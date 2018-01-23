@@ -9,17 +9,20 @@ FILES=		m65fdisk.prg
 M65IDESOURCES=	fdisk.c \
 		fdisk_memory.c \
 		fdisk_screen.c \
+		fdisk_fat32.c \
 		fdisk_hal_mega65.c
 
 ASSFILES=	fdisk.s \
 		fdisk_memory.s \
 		fdisk_screen.s \
+		fdisk_fat32.s \
 		fdisk_hal_mega65.s \
 		charset.s
 
 HEADERS=	Makefile \
 		fdisk_memory.h \
 		fdisk_screen.h \
+		fdisk_fat32.h \
 		fdisk_hal.h \
 		ascii.h
 

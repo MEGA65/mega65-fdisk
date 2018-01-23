@@ -227,7 +227,7 @@ void sdcard_writesector(const uint32_t sector_number)
       }
 
     write_count++;
-    POKE(0xD020,write_count&0xff);
+    POKE(0xD020,write_count&0x0f);
 
     // Delay a while to work around SD controller bug
     if (0)
@@ -243,7 +243,7 @@ void sdcard_writesector(const uint32_t sector_number)
     if (!(PEEK(sd_ctl)&0xe7)) {
       write_count++;
       
-      POKE(0xD020,write_count&0xff);
+      POKE(0xD020,write_count&0x0f);
 
       // There is a bug in the SD controller: You have to read between writes, or it
       // gets really upset.
@@ -257,10 +257,10 @@ void sdcard_writesector(const uint32_t sector_number)
       	continue;
       }
 
-      if (1) {
+      if (0) {
 	write_line("Wrote sector $$$$$$$$, result=$$",2);      
 	screen_hex(screen_line_address-80+2+14,sector_number);
-	screen_hex(screen_line_address-80+2+24,result);
+	screen_hex(screen_line_address-80+2+30,result);
       }
 
       return;
@@ -290,6 +290,8 @@ void sdcard_erase(const uint32_t first_sector,const uint32_t last_sector)
 
   for(n=first_sector;n<=last_sector;n++) {
     sdcard_writesector(n);
+    // Show count-down
+    screen_decimal(screen_line_address,last_sector-n);
     //    fprintf(stderr,"."); fflush(stderr);
   }
   
