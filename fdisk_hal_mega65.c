@@ -37,7 +37,9 @@ void sdcard_reset(void)
   // Reset and release reset
   //  write_line("Resetting SD card...",0);
 
-  // Command read
+  // Clear SDHC flag
+  POKE(sd_ctl,0x40);
+  
   POKE(sd_ctl,0);
   usleep(50000L);
   POKE(sd_ctl,1);
@@ -61,6 +63,9 @@ uint32_t sdcard_getsize(void)
 
   // Work out if it is SD or SDHC first of all
   // SD cards can't read at non-sector aligned addresses
+  sdcard_reset();
+  write_line("$d680 = $",0);
+  screen_hex_byte(screen_line_address-80+9,PEEK(sd_ctl));
   sdcard_readsector(1);
   if (!PEEK(sd_ctl)) {
     write_line("SDHC card detected. Using sector addressing.",0);
