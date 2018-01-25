@@ -329,7 +329,9 @@ void build_mega65_sys_sector(const uint32_t sys_partition_sectors)
   uint32_t slot_count=(sys_partition_sectors-reserved_sectors)/(641*1024/512);
   uint16_t dir_size;
 
-  if (slot_count>0xffff) slot_count=0xffff;
+  // Limit number of freeze slots to 16 bit counters
+  if (slot_count>=0xffff) slot_count=0xffff;
+  
   dir_size=1+(slot_count/4);
 
   freeze_dir_sectors=dir_size;
@@ -445,6 +447,8 @@ int main(int argc,char **argv)
 
   // Memory map the SD card sector buffer on MEGA65
   sdcard_map_sector_buffer();
+
+  write_line("Sector Buffer mapped",0);
   
   sdcard_sectors = sdcard_getsize();
 
@@ -458,8 +462,11 @@ int main(int argc,char **argv)
   // allow 1GB for 1,024 1MB freeze images and 1,024 1MB service images.
   // (note that freeze images might end up being a funny size to allow for all
   // mem plus a D81 image to be saved. This is all to be determined.)
-  // Simple solution for now: Use 1/2 disk for system partition.
+  // Simple solution for now: Use 1/2 disk for system partition, or 2GiB, whichever
+  // is smaller.
   sys_partition_sectors=(sdcard_sectors-0x0800)>>1;
+  if (sys_partition_sectors>(2*1024*1024*1024/512))
+    sys_partition_sectors=(2*1024*1024*1024/512);
   sys_partition_sectors&=0xfffff800; // round down to nearest 1MB boundary
   fat_partition_sectors=sdcard_sectors-0x800-sys_partition_sectors;
 
@@ -664,6 +671,11 @@ int main(int argc,char **argv)
     {
       unsigned long first_sector;
       write_line("Writing current loaded ROM to FAT32 file system",0);
+
+      // Check if kickstart has patched $FFD2 (which it does for utility menu jobs,
+      // when it thinks there is no ROM loaded, which currently is always).
+      if (lpeek(0x2ffd2L)==0x60) lpoke(0x2ffd2L,0x6c);
+      
       first_sector=fat32_create_contiguous_file("MEGA65  ROM",0x20000L,
 						fat_partition_start+rootdir_sector,
 						fat_partition_start+fat1_sector,
