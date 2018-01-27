@@ -44,6 +44,11 @@ void sdcard_reset(void)
   usleep(50000L);
   POKE(sd_ctl,1);
   usleep(50000L);
+
+  if (sdhc_card)
+    // Set SDHC flag (else writing doesnt work for some reason)
+    POKE(sd_ctl,0x41);
+    
 }
 
 void mega65_fast(void)
