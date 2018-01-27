@@ -60,7 +60,6 @@ uint32_t sdcard_getsize(void)
 {
   // Work out the largest sector number we can read without an error
   
-  uint32_t sector_address;
   uint32_t sector_number=0x00200000U;
   uint32_t step         =0x00200000U;
   
@@ -293,14 +292,6 @@ void sdcard_writesector(const uint32_t sector_number)
     write_count++;
     POKE(0xD020,write_count&0x0f);
 
-    // Delay a while to work around SD controller bug
-    if (0)
-      {
-	long i;
-	for(i=0;i<100000;i++) continue;
-      }
-    
-    
     // Note result
     result=PEEK(sd_ctl);
     
@@ -321,11 +312,9 @@ void sdcard_writesector(const uint32_t sector_number)
       	continue;
       }
 
-      if (0) {
-	write_line("Wrote sector $$$$$$$$, result=$$",2);      
-	screen_hex(screen_line_address-80+2+14,sector_number);
-	screen_hex(screen_line_address-80+2+30,result);
-      }
+      //      write_line("Wrote sector $$$$$$$$, result=$$",2);      
+      //      screen_hex(screen_line_address-80+2+14,sector_number);
+      //      screen_hex(screen_line_address-80+2+30,result);
 
       return;
     }
@@ -348,7 +337,7 @@ void sdcard_writesector(const uint32_t sector_number)
 void sdcard_erase(const uint32_t first_sector,const uint32_t last_sector)
 {
   uint32_t n;
-  lfill(sd_sectorbuffer,0,512);
+  lfill((uint32_t)sector_buffer,0,512);
 
   //  fprintf(stderr,"ERASING SECTORS %d..%d\r\n",first_sector,last_sector);
 
