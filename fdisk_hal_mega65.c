@@ -70,7 +70,13 @@ uint32_t sdcard_getsize(void)
   sdcard_reset();
   write_line("$d680 = $",0);
   screen_hex_byte(screen_line_address-80+9,PEEK(sd_ctl));
-  sdcard_readsector(1);
+  // Setup non-aligned address
+  POKE(0xD681U,1); POKE(0xD682U,0); POKE(0xD683U,0); POKE(0xD684U,0);
+  // Trigger read
+  POKE(0xD680U,2);
+  // Then sleep for plenty of time for the read to complete
+  usleep(65535U);  usleep(65535U);  usleep(65535U);  usleep(65535U);
+  		
   if (!PEEK(sd_ctl)) {
     write_line("SDHC card detected. Using sector addressing.",0);
     sdhc_card=1;
@@ -199,6 +205,9 @@ void sdcard_readsector(const uint32_t sector_number)
 	  {
 	    return;
 	  }
+	// Sometimes we see this result, i.e., sdcard.vhdl thinks it is done,
+	// but sdcardio.vhdl thinks not. This means a read error
+	if (PEEK(sd_ctl)==0x01) return;
       }
 
     // Command read
@@ -210,6 +219,9 @@ void sdcard_readsector(const uint32_t sector_number)
 	{
 	  return;
 	}
+      // Sometimes we see this result, i.e., sdcard.vhdl thinks it is done,
+      // but sdcardio.vhdl thinks not. This means a read error
+      if (PEEK(sd_ctl)==0x01) return;
     }
 
       // Note result
