@@ -91,8 +91,8 @@ uint32_t sdcard_getsize(void)
     // trouble. However, 32bits x 512byte sectors = 16TiB addressable.
     // It thus seems that the top byte of the address may not be safe to use,
     // or at least the top few bits.
-    sector_number=0x00800000U;
-    step=0x00800000U;
+    sector_number=0x02000000U;
+    step=0x02000000U;
     write_line("Determining size of SDHC card...",0);
   } else
     write_line("Determining size of SD card...",0);
@@ -103,6 +103,12 @@ uint32_t sdcard_getsize(void)
 
     // Work out address of sector
     // XXX - Assumes SD, not SDHC card
+
+    if (step>0x80) {
+      write_line("Reading sector @ $",0);
+      screen_hex(screen_line_address-80+18,sector_number);
+    }
+    
     sdcard_readsector(sector_number);
     
     // Note result
