@@ -15,3 +15,8 @@ fdisk_screen.s
 m65fdisk.map
 m65fdisk.prg
 pngprepare
+fdisk_fat32.c~
+fdisk_fat32.o
+fdisk_fat32.s
+vivado_lab.jou
+vivado_lab.log
