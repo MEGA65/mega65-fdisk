@@ -1,6 +1,6 @@
 
-CC65=	/usr/local/bin/cc65
-CL65=	/usr/local/bin/cl65
+CC65=	cc65
+CL65=	cl65
 COPTS=	-t c64 -O -Or -Oi -Os --cpu 65c02
 LOPTS=	
 
