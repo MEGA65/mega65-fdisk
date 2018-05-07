@@ -9,7 +9,7 @@
 #define POKE(X,Y) (*(unsigned char*)(X))=Y
 #define PEEK(X) (*(unsigned char*)(X))
 
-long sd_sectorbuffer=0xffd6000;
+long sd_sectorbuffer=0xffd6e00;
 uint16_t sd_ctl=0xd680L;
 uint16_t sd_addr=0xd681L;
 uint16_t sd_errorcode=0xd6daL;
