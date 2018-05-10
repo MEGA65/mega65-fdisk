@@ -9,10 +9,10 @@
 #define POKE(X,Y) (*(unsigned char*)(X))=Y
 #define PEEK(X) (*(unsigned char*)(X))
 
-long sd_sectorbuffer=0xffd6e00;
-uint16_t sd_ctl=0xd680L;
-uint16_t sd_addr=0xd681L;
-uint16_t sd_errorcode=0xd6daL;
+const long sd_sectorbuffer=0xffd6e00;
+const uint16_t sd_ctl=0xd680L;
+const uint16_t sd_addr=0xd681L;
+const uint16_t sd_errorcode=0xd6daL;
 
 unsigned char sdhc_card=0;
 
@@ -41,9 +41,14 @@ void sdcard_reset(void)
   POKE(sd_ctl,0x40);
   
   POKE(sd_ctl,0);
-  usleep(50000L);
+  usleep(10000L);
   POKE(sd_ctl,1);
-  usleep(50000L);
+
+  // Now wait for SD card reset to complete
+  while (PEEK(sd_ctl)&2) {
+    continue;
+  }
+  
 
   if (sdhc_card)
     // Set SDHC flag (else writing doesnt work for some reason)
@@ -56,6 +61,26 @@ void mega65_fast(void)
   POKE(0,65);
 }
 
+void show_card_size(uint32_t sector_number)
+{
+  // Work out size in MB and tell user
+  char col=6;
+  uint32_t megs=(sector_number+1L)/2048L;
+  uint32_t gigs=0;
+  if (megs&0xffff0000L) {
+    gigs=megs/1024L;
+    megs=gigs;
+  }
+  screen_decimal(screen_line_address,megs);
+  if (megs<10000) col=5;
+  if (megs<1000) col=4;
+  if (megs<100) col=3;
+  if (!gigs)
+    write_line("MiB SD CARD FOUND.",col);
+  else
+    write_line("GiB SD CARD FOUND.",col);
+}
+
 uint32_t sdcard_getsize(void)
 {
   // Work out the largest sector number we can read without an error
@@ -64,12 +89,10 @@ uint32_t sdcard_getsize(void)
   uint32_t step         =0x00200000U;
   
   char result;
-
+  
   // Work out if it is SD or SDHC first of all
   // SD cards can't read at non-sector aligned addresses
   sdcard_reset();
-  write_line("$d680 = $",0);
-  screen_hex_byte(screen_line_address-80+9,PEEK(sd_ctl));
   // Setup non-aligned address
   POKE(0xD681U,1); POKE(0xD682U,0); POKE(0xD683U,0); POKE(0xD684U,0);
   // Trigger read
@@ -85,77 +108,49 @@ uint32_t sdcard_getsize(void)
     sdcard_reset();
     sdhc_card=0;
   }
-  
+
   if (sdhc_card) {
     // SDHC claims 32GB limit, and reading from beyond that might cause
     // trouble. However, 32bits x 512byte sectors = 16TiB addressable.
     // It thus seems that the top byte of the address may not be safe to use,
     // or at least the top few bits.
     sector_number=0x02000000U;
-    step=0x02000000U;
+    step=sector_number;
     write_line("Determining size of SDHC card...",0);
   } else
     write_line("Determining size of SD card...",0);
 
-  // Set address to read/write
-  while (step) {
-    // Try to read sector number with bit set
-
-    // Work out address of sector
-    // XXX - Assumes SD, not SDHC card
-
-    if (step>0x80) {
-      write_line("Reading sector @ $",0);
-      screen_hex(screen_line_address-80+18,sector_number);
-    }
-    
+  // Work out size of SD card in a safe way
+  // (binary search of sector numbers is NOT safe for some reason.
+  //  It frequently reports bigger than the size of the card)
+  sector_number=0;
+  step=16*2048; // = 16MiB
+  while(sector_number<0x10000000U) {
     sdcard_readsector(sector_number);
-    
-    // Note result
-    result=PEEK(sd_ctl);
-    if (PEEK(sd_errorcode)) {
-      // New SD controller reports error code elsewhere.
-      // While we synthesise a new bitstream that sets the old
-      // error flag, we have to check this explicitly.
-      // However, what will remain, is that when the new controller
-      // does have a read error, you have to reset the entire SD card
-      // before it will continue.
-      result|=0x60;
-      sdcard_open();
-    }
-
-    // If we have a read error, then remove this bit from the mask
-    if (result&0x60) {
-      // Now mask out bit in sector number, and try again
-      //      write_line("Error reading sector $",0);
-      //      screen_hex(screen_line_address-79+21,sector_number);      
+    result=PEEK(sd_ctl)&0x63;
+    if (result) {
+      // Failed to read this, so reduce step size, and then resume.
       sector_number-=step;
-    } else {
-      //      write_line("OK reading sector $",0);
-      //      screen_hex(screen_line_address-79+18,sector_number);      
+      step=step>>2;
+      if (!step) break;
     }
-    // Advance half step
-    step=step>>1;
     sector_number+=step;
 
-    if ((!sdhc_card)&&(step<512)) break;
+    // show card size as we figure it out,
+    // and stay on the same line of output
+    show_card_size(sector_number);
+    screen_line_address-=80;
   }
 
   // Report number of sectors
-  //  screen_decimal(screen_line_address,sector_number/1024);
-  //  write_line("K Sector SD CARD.",8);  
+  write_line("Maximum readable sector is $",0);
+  screen_hex(screen_line_address-80+28,sector_number);
+  screen_decimal(screen_line_address,sector_number/1024L);
+  write_line("K Sector SD CARD.",6);  
   
   // Work out size in MB and tell user
-  {
-    char col=6;
-    int megs=(sector_number+1)/2048;
-    screen_decimal(screen_line_address,megs);
-    if (megs<10000) col=5;
-    if (megs<1000) col=4;
-    if (megs<100) col=3;
-    write_line("MiB SD CARD FOUND.",col);
-  }
-
+  show_card_size(sector_number);
+  
   return sector_number;
 }
 

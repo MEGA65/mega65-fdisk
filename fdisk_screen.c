@@ -8,7 +8,7 @@ long screen_line_address=SCREEN_ADDRESS;
 char screen_column=0;
 
 unsigned char *footer_messages[FOOTER_MAX+1]={
-  "MEGA65 FDISK+FORMAT V00.05 : (C) COPYRIGHT 2017-2018 PAUL GARDNER-STEPHEN ETC.  ",
+  "MEGA65 FDISK+FORMAT V00.06 : (C) COPYRIGHT 2017-2018 PAUL GARDNER-STEPHEN ETC.  ",
   "                                                                                ",
   "A FATAL ERROR HAS OCCURRED, SORRY.                                              "
 };
@@ -140,14 +140,14 @@ void screen_decimal(unsigned int addr,unsigned int v)
     screen_hex_buffer[3]=screen_hex_buffer[4];
     screen_hex_buffer[4]=' ';
   }
+  
   // Copy to screen
-  for(j=0;j<4;j++) POKE(addr+j,screen_hex_buffer[j]);
+  for(j=0;j<5;j++) POKE(addr+j,screen_hex_buffer[j]);
 }
 
 void format_decimal(const int addr,const int value, const char columns)
 {
   char i;
-  char c;
   char dec[6];
   screen_decimal((int)&dec[0],value);
 
