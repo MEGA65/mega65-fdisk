@@ -46,7 +46,8 @@ void sdcard_reset(void)
 
   // Now wait for SD card reset to complete
   while (PEEK(sd_ctl)&2) {
-    continue;
+    POKE(0x8000,PEEK(sd_ctl)&2);
+    POKE(0xd020,(PEEK(0xd020)+1)&15);
   }
   
 
