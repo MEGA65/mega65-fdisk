@@ -1,6 +1,6 @@
 
-CC65=	cc65
-CL65=	cl65
+CC65=	cc65/bin/cc65
+CL65=	cc65/bin/cl65
 COPTS=	-t c64 -O -Or -Oi -Os --cpu 65c02
 LOPTS=	
 
@@ -28,11 +28,15 @@ HEADERS=	Makefile \
 
 DATAFILES=	ascii8x8.bin
 
-
-%.s:	%.c $(HEADERS) $(DATAFILES)
+%.s:	%.c $(HEADERS) $(DATAFILES) $(CC65)
 	$(CC65) $(COPTS) -o $@ $<
 
 all:	$(FILES)
+
+$(CC65):
+	git submodule init
+	git submodule update
+	(cd cc65 && make -j 8)
 
 ascii8x8.bin: ascii00-7f.png pngprepare
 	./pngprepare charrom ascii00-7f.png ascii8x8.bin
@@ -45,7 +49,7 @@ ascii.h:	asciih
 pngprepare:	pngprepare.c
 	$(CC) -I/usr/local/include -L/usr/local/lib -o pngprepare pngprepare.c -lpng
 
-m65fdisk.prg:	$(ASSFILES) $(DATAFILES)
+m65fdisk.prg:	$(ASSFILES) $(DATAFILES) $(CL65)
 	$(CL65) $(COPTS) $(LOPTS) -vm -m m65fdisk.map -o m65fdisk.prg $(ASSFILES)
 
 clean:
