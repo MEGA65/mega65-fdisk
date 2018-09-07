@@ -423,12 +423,17 @@ void show_mbr(void)
 {
   char i;
   
-  sdcard_readsector(0);
-
+  sdcard_readsector(0);  
+  
   write_line(" ",0);
-  write_line("Current partition table:",0);
-  for(i=0;i<4;i++) {
-    show_partition_entry(i);
+
+  if ((sector_buffer[0x1fe]!=0x55)||(sector_buffer[0x1ff]!=0xAA))
+    write_line("Current partition table is invalid.",0);
+  else {  
+    write_line("Current partition table:",0);
+    for(i=0;i<4;i++) {
+      show_partition_entry(i);
+    }
   }
 }
 
@@ -448,7 +453,7 @@ int main(int argc,char **argv)
   // Memory map the SD card sector buffer on MEGA65
   sdcard_map_sector_buffer();
 
-  write_line("Sector Buffer mapped",0);
+  write_line("Detecting SD card type and size (can take a while)",0);
   
   sdcard_sectors = sdcard_getsize();
 
@@ -575,6 +580,18 @@ int main(int argc,char **argv)
 	    fat_partition_start,
 	    fat_partition_sectors);
   sdcard_writesector(0);
+  show_mbr();
+
+  while(0) {
+  build_mbr(sys_partition_start,
+	    sys_partition_sectors,
+	    fat_partition_start,
+	    fat_partition_sectors);
+  sdcard_writesector(0);
+  //  show_mbr();
+
+  }
+
 
 #ifdef __CC65__
   // write_line("Erasing reserved sectors before first partition...",0);

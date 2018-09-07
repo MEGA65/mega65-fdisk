@@ -26,7 +26,7 @@ void usleep(uint32_t micros)
   // this is not totally accurate, but is a reasonable approach
   while(micros>64) {    
     uint8_t b=PEEK(0xD012);
-    while(PEEK(0xD011)==b) continue;
+    while(PEEK(0xD012)==b) continue;
     micros-=64;
   }
   return;
@@ -41,20 +41,18 @@ void sdcard_reset(void)
   POKE(sd_ctl,0x40);
   
   POKE(sd_ctl,0);
-  usleep(10000L);
   POKE(sd_ctl,1);
 
   // Now wait for SD card reset to complete
-  while (PEEK(sd_ctl)&2) {
-    POKE(0x8000,PEEK(sd_ctl)&2);
+  while (PEEK(sd_ctl)&3) {
     POKE(0xd020,(PEEK(0xd020)+1)&15);
   }
   
-
-  if (sdhc_card)
+  if (sdhc_card) {
     // Set SDHC flag (else writing doesnt work for some reason)
+    write_line("Setting SDHC mode",0);
     POKE(sd_ctl,0x41);
-    
+  }
 }
 
 void mega65_fast(void)
@@ -94,18 +92,34 @@ uint32_t sdcard_getsize(void)
   // Work out if it is SD or SDHC first of all
   // SD cards can't read at non-sector aligned addresses
   sdcard_reset();
+
+  // Begin with aligned address, and confirm it works ok.
+  POKE(0xD681U,0); POKE(0xD682U,0); POKE(0xD683U,0); POKE(0xD684U,0);
+  // Trigger read
+  POKE(0xD680U,2);
+
+  for(result=0;result<100;result++) {
+    if (PEEK(sd_ctl&3)==0) break;
+    usleep(65535U);
+  }
+
+  
   // Setup non-aligned address
-  POKE(0xD681U,1); POKE(0xD682U,0); POKE(0xD683U,0); POKE(0xD684U,0);
+  POKE(0xD681U,2); POKE(0xD682U,0); POKE(0xD683U,0); POKE(0xD684U,0);
   // Trigger read
   POKE(0xD680U,2);
   // Then sleep for plenty of time for the read to complete
-  usleep(65535U);  usleep(65535U);  usleep(65535U);  usleep(65535U);
-  		
+  for(result=0;result<100;result++) {
+    if (PEEK(sd_ctl&3)==0) break;
+    usleep(65535U);
+  }
+
   if (!PEEK(sd_ctl)) {
     write_line("SDHC card detected. Using sector addressing.",0);
     sdhc_card=1;
   } else {
     write_line("SDSC (<4GB) card detected. Using byte addressing.",0);
+    POKE(0xD680U,0x40);
     sdcard_reset();
     sdhc_card=0;
   }
@@ -195,8 +209,8 @@ void sdcard_readsector(const uint32_t sector_number)
   POKE(sd_addr+2,((uint32_t)sector_address>>16)&0xff);
   POKE(sd_addr+3,((uint32_t)sector_address>>24)&0xff);
 
-  //  write_line("Reading sector @ $",0);
-  //  screen_hex(screen_line_address-80+18,sector_address);
+  // write_line("Reading sector @ $",0);
+  // screen_hex(screen_line_address-80+18,sector_address);
   
   while(tries<10) {
 
@@ -217,6 +231,7 @@ void sdcard_readsector(const uint32_t sector_number)
     
     // Wait for read to complete
     while (PEEK(sd_ctl)&0x3) {
+      //      write_line("Waiting for read to complete",0);
       if (PEEK(sd_ctl)&0x40)
 	{
 	  return;
@@ -244,6 +259,8 @@ void sdcard_readsector(const uint32_t sector_number)
   
 }
 
+uint8_t verify_buffer[512];
+
 void sdcard_writesector(const uint32_t sector_number)
 {
   // Copy buffer into the SD card buffer, and then execute the write job
@@ -261,11 +278,11 @@ void sdcard_writesector(const uint32_t sector_number)
   POKE(sd_addr+2,(sector_address>>16)&0xff);
   POKE(sd_addr+3,(sector_address>>24)&0xff);
 
-  // Copy data to hardware sector buffer via DMA
-  lcopy((long)sector_buffer,sd_sectorbuffer,512);
-  
   while(tries<10) {
 
+    // Copy data to hardware sector buffer via DMA
+    lcopy((long)sector_buffer,sd_sectorbuffer,512);
+  
     // Wait for SD card to be ready
     counter=0;
     while (PEEK(sd_ctl)&3)
@@ -322,29 +339,38 @@ void sdcard_writesector(const uint32_t sector_number)
       // Does it just need some time between accesses?
       
       POKE(sd_ctl,2); // read the sector we just wrote
+
       while (PEEK(sd_ctl)&3) {
       	continue;
       }
 
+      // Copy the read data to a buffer for verification
+      lcopy(sd_sectorbuffer,(long)verify_buffer,512);
+
+      // VErify that it matches the data we wrote
+      for(i=0;i<512;i++) {
+	if (sector_buffer[i]!=verify_buffer[i]) break;
+      }
+      if (i!=512) {
+	// VErify error has occurred
+	write_line("Verify error for sector $$$$$$$$",0);
+	screen_hex(screen_line_address-80+24,sector_number);
+      }
+      else {
       //      write_line("Wrote sector $$$$$$$$, result=$$",2);      
       //      screen_hex(screen_line_address-80+2+14,sector_number);
       //      screen_hex(screen_line_address-80+2+30,result);
 
-      return;
+	return;
+      }
     }
 
     POKE(0xd020,(PEEK(0xd020)+1)&0xf);
 
-    // Wait a bit first for SD card to get happy
-    for(i=0;i<32000;i++) continue;
   }
 
   write_line("Write error @ $$$$$$$$$",2);      
   screen_hex(screen_line_address-80+2+16,sector_number);
-  {
-    long i;
-    for(i=0;i<100000;i++) continue;
-  }
   
 }
 

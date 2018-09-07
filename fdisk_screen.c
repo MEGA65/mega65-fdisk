@@ -242,6 +242,9 @@ char read_line(char *buffer,unsigned char maxlen)
   char reverse=0x90;
 
   // Read input using hardware keyboard scanner
+
+  // Flush keyboard input queue before reading input
+  while (PEEK(0xD610)) POKE(0xD610,0);
   
   while(len<maxlen) {
     c=*(unsigned char *)0xD610;
