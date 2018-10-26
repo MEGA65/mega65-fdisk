@@ -255,6 +255,8 @@ void sdcard_readsector(const uint32_t sector_number)
 
     // Reset SD card
     sdcard_open();
+
+    tries++;
   }
   
 }
