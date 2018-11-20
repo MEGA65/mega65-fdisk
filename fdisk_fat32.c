@@ -93,6 +93,8 @@ long fat32_create_contiguous_file(char *name, long size,
   sector_buffer[offset+0x0b]=0x20; // Archive bit set
   sector_buffer[offset+0x1A]=start_cluster; 
   sector_buffer[offset+0x1B]=start_cluster>>8; 
+  sector_buffer[offset+0x14]=start_cluster>>16; 
+  sector_buffer[offset+0x15]=start_cluster>>24; 
   sector_buffer[offset+0x1C]=(size>>0)&0xff; 
   sector_buffer[offset+0x1D]=(size>>8L)&0xff; 
   sector_buffer[offset+0x1E]=(size>>16L)&0xff; 
