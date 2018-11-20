@@ -98,18 +98,19 @@ uint32_t sdcard_getsize(void)
   // Trigger read
   POKE(0xD680U,2);
 
-  for(result=0;result<100;result++) {
+  // Allow a lot of time for first read after reset to complete
+  // (some cards take a while)
+  for(result=0;result<20;result++) {
     if (PEEK(sd_ctl&3)==0) break;
     usleep(65535U);
   }
-
   
   // Setup non-aligned address
   POKE(0xD681U,2); POKE(0xD682U,0); POKE(0xD683U,0); POKE(0xD684U,0);
   // Trigger read
   POKE(0xD680U,2);
   // Then sleep for plenty of time for the read to complete
-  for(result=0;result<100;result++) {
+  for(result=0;result<20;result++) {
     if (PEEK(sd_ctl&3)==0) break;
     usleep(65535U);
   }
@@ -145,6 +146,10 @@ uint32_t sdcard_getsize(void)
     result=PEEK(sd_ctl)&0x63;
     if (result) {
       // Failed to read this, so reduce step size, and then resume.
+
+      // Reset card ready for next try
+      sdcard_reset();
+      
       sector_number-=step;
       step=step>>2;
       if (!step) break;
@@ -154,6 +159,7 @@ uint32_t sdcard_getsize(void)
     // show card size as we figure it out,
     // and stay on the same line of output
     show_card_size(sector_number);
+    POKE(0xD020U,PEEK(0xD020U)+1);
     screen_line_address-=80;
   }
 
@@ -191,6 +197,8 @@ void sdcard_unmap_sector_buffer(void)
   POKE(sd_ctl,0x82);
 }
 
+unsigned short timeout;
+
 void sdcard_readsector(const uint32_t sector_number)
 {
   char tries=0;
@@ -209,14 +217,16 @@ void sdcard_readsector(const uint32_t sector_number)
   POKE(sd_addr+2,((uint32_t)sector_address>>16)&0xff);
   POKE(sd_addr+3,((uint32_t)sector_address>>24)&0xff);
 
-  // write_line("Reading sector @ $",0);
-  // screen_hex(screen_line_address-80+18,sector_address);
+  //  write_line("Reading sector @ $",0);
+  //  screen_hex(screen_line_address-80+18,sector_address);
   
   while(tries<10) {
 
     // Wait for SD card to be ready
+    timeout=50000;
     while (PEEK(sd_ctl)&0x3)
       {
+	timeout--; if (!timeout) return;
 	if (PEEK(sd_ctl)&0x40)
 	  {
 	    return;
@@ -230,8 +240,10 @@ void sdcard_readsector(const uint32_t sector_number)
     POKE(sd_ctl,2);
     
     // Wait for read to complete
+    timeout=50000;
     while (PEEK(sd_ctl)&0x3) {
-      //      write_line("Waiting for read to complete",0);
+      timeout--; if (!timeout) return;
+	//      write_line("Waiting for read to complete",0);
       if (PEEK(sd_ctl)&0x40)
 	{
 	  return;
