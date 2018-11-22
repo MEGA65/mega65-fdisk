@@ -223,7 +223,7 @@ void sdcard_readsector(const uint32_t sector_number)
   while(tries<10) {
 
     // Wait for SD card to be ready
-    timeout=50000;
+    timeout=50000U;
     while (PEEK(sd_ctl)&0x3)
       {
 	timeout--; if (!timeout) return;
@@ -240,7 +240,7 @@ void sdcard_readsector(const uint32_t sector_number)
     POKE(sd_ctl,2);
     
     // Wait for read to complete
-    timeout=50000;
+    timeout=50000U;
     while (PEEK(sd_ctl)&0x3) {
       timeout--; if (!timeout) return;
 	//      write_line("Waiting for read to complete",0);
@@ -292,6 +292,26 @@ void sdcard_writesector(const uint32_t sector_number)
   POKE(sd_addr+2,(sector_address>>16)&0xff);
   POKE(sd_addr+3,(sector_address>>24)&0xff);
 
+  // Read the sector and see if it already has the correct contents.
+  // If so, nothing to write
+
+  POKE(sd_ctl,2); // read the sector we just wrote
+  
+  while (PEEK(sd_ctl)&3) {
+    continue;
+  }
+  
+  // Copy the read data to a buffer for verification
+  lcopy(sd_sectorbuffer,(long)verify_buffer,512);
+  
+  // VErify that it matches the data we wrote
+  for(i=0;i<512;i++) {
+    if (sector_buffer[i]!=verify_buffer[i]) break;
+  }
+  if (i==512) {
+    return;
+  } 
+  
   while(tries<10) {
 
     // Copy data to hardware sector buffer via DMA
