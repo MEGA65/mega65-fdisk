@@ -303,9 +303,10 @@ void build_mega65_sys_sector(const uint32_t sys_partition_sectors)
     The size of each is subject to change, so is left flexible.  One thing
     that is not resolved, is whether to allow including a D81 image in either.
 
-    For now, we will allow 128K RAM + 128KB "ROM" + 32KB colour RAM 
+    For now, we will allow 384KB RAM (including 128K "ROM" area) + 32KB colour RAM 
     + 32KB IO regs (including 4KB thumbnail).
-    That all up means 320KB per frozen program slot.
+    That all up means 448KB per frozen program slot.  We'll just make them 512KB for
+    good measure.
     
     For some services at least, we intend to allow for a substantial part of
     memory to be preserved, so we need to have a mechanism that indicates what
@@ -317,16 +318,16 @@ void build_mega65_sys_sector(const uint32_t sys_partition_sectors)
     We will also likely put the hardware/access permission flags in there
     somewhere, too.
 
-    Anyway, so we need to divide the available space by (320KB + 128 bytes).
+    Anyway, so we need to divide the available space by (512KB + 128 bytes).
     Two types of area means simplest approach with equal slots for both means
-    dividing space by (320KB + 128 bytes)*2= ~641KB.    
+    dividing space by (512KB + 128 bytes)*2= ~1025KB.    
   */
   uint16_t i;
-  uint32_t slot_size=320*1024/512;
+  uint32_t slot_size=512*1024/512;
   // Take 1MB from partition size, for reserved space when
   // calculating what can fit.
   uint32_t reserved_sectors=1024*1024/512;
-  uint32_t slot_count=(sys_partition_sectors-reserved_sectors)/(641*1024/512);
+  uint32_t slot_count=(sys_partition_sectors-reserved_sectors)/(slot_size*2+1);
   uint16_t dir_size;
 
   // Limit number of freeze slots to 16 bit counters
