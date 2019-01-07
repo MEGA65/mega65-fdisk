@@ -183,7 +183,11 @@ void setup_screen(void)
   v&=0xfc;
   v|=0x01;
   *(unsigned char *)0xDD00U=v;
-
+  v=*(unsigned char *)0xDD02U;
+  v|=0x03;
+  *(unsigned char *)0xDD02U=v;  
+  
+  
   // Screen colours
   POKE(0xD020U,0);
   POKE(0xD021U,6);
