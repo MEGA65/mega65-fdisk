@@ -53,46 +53,49 @@ void build_mbr(const uint32_t sys_partition_start,
   sector_buffer[0x1ba]=0xcb;
   sector_buffer[0x1bb]=0xa6;
 
+  // We have to put the FAT partition first for people running bitstreams from
+  // the microSD card, as otherwise the N4/N4DDR boards don't find the FAT partition
+  
   // MEGA65 System Partition entry
-  sector_buffer[0x1be]=0x00;  // Not bootable by DOS
-  sector_buffer[0x1bf]=0x00;  // 3 bytes CHS starting point
-  sector_buffer[0x1c0]=0x00;
-  sector_buffer[0x1c1]=0x00;
-  sector_buffer[0x1c2]=0x41;  // Partition type (MEGA65 System Partition)
-  sector_buffer[0x1c3]=0x00;  // 3 bytes CHS end point - SHOULD CHANGE WITH DISK SIZE
-  sector_buffer[0x1c4]=0x00;
-  sector_buffer[0x1c5]=0x00;
-  // LBA starting sector of partition (usually @ 0x0800 = sector 2,048 = 1MB)
-  sector_buffer[0x1c6]=(sys_partition_start>>0)&0xff;  
-  sector_buffer[0x1c7]=(sys_partition_start>>8)&0xff;  
-  sector_buffer[0x1c8]=(sys_partition_start>>16)&0xff;  
-  sector_buffer[0x1c9]=(sys_partition_start>>24)&0xff;  
-  // LBA size of partition in sectors
-  sector_buffer[0x1ca]=(sys_partition_sectors>>0)&0xff;  
-  sector_buffer[0x1cb]=(sys_partition_sectors>>8)&0xff;  
-  sector_buffer[0x1cc]=(sys_partition_sectors>>16)&0xff;  
-  sector_buffer[0x1cd]=(sys_partition_sectors>>24)&0xff;  
-  
-  
-  // FAT32 Partition entry
   sector_buffer[0x1ce]=0x00;  // Not bootable by DOS
   sector_buffer[0x1cf]=0x00;  // 3 bytes CHS starting point
   sector_buffer[0x1d0]=0x00;
   sector_buffer[0x1d1]=0x00;
-  sector_buffer[0x1d2]=0x0c;  // Partition type (VFAT32)
+  sector_buffer[0x1d2]=0x41;  // Partition type (MEGA65 System Partition)
   sector_buffer[0x1d3]=0x00;  // 3 bytes CHS end point - SHOULD CHANGE WITH DISK SIZE
   sector_buffer[0x1d4]=0x00;
   sector_buffer[0x1d5]=0x00;
-  // LBA starting sector of FAT32 partition
-  sector_buffer[0x1d6]=(fat_partition_start>>0)&0xff;  
-  sector_buffer[0x1d7]=(fat_partition_start>>8)&0xff;  
-  sector_buffer[0x1d8]=(fat_partition_start>>16)&0xff;  
-  sector_buffer[0x1d9]=(fat_partition_start>>24)&0xff;  
+  // LBA starting sector of partition (usually @ 0x0800 = sector 2,048 = 1MB)
+  sector_buffer[0x1d6]=(sys_partition_start>>0)&0xff;  
+  sector_buffer[0x1d7]=(sys_partition_start>>8)&0xff;  
+  sector_buffer[0x1d8]=(sys_partition_start>>16)&0xff;  
+  sector_buffer[0x1d9]=(sys_partition_start>>24)&0xff;  
   // LBA size of partition in sectors
-  sector_buffer[0x1da]=(fat_partition_sectors>>0)&0xff;  
-  sector_buffer[0x1db]=(fat_partition_sectors>>8)&0xff;  
-  sector_buffer[0x1dc]=(fat_partition_sectors>>16)&0xff;  
-  sector_buffer[0x1dd]=(fat_partition_sectors>>24)&0xff;  
+  sector_buffer[0x1da]=(sys_partition_sectors>>0)&0xff;  
+  sector_buffer[0x1db]=(sys_partition_sectors>>8)&0xff;  
+  sector_buffer[0x1dc]=(sys_partition_sectors>>16)&0xff;  
+  sector_buffer[0x1dd]=(sys_partition_sectors>>24)&0xff;  
+  
+  
+  // FAT32 Partition entry
+  sector_buffer[0x1be]=0x00;  // Not bootable by DOS
+  sector_buffer[0x1bf]=0x00;  // 3 bytes CHS starting point
+  sector_buffer[0x1c0]=0x00;
+  sector_buffer[0x1c1]=0x00;
+  sector_buffer[0x1c2]=0x0c;  // Partition type (VFAT32)
+  sector_buffer[0x1c3]=0x00;  // 3 bytes CHS end point - SHOULD CHANGE WITH DISK SIZE
+  sector_buffer[0x1c4]=0x00;
+  sector_buffer[0x1c5]=0x00;
+  // LBA starting sector of FAT32 partition
+  sector_buffer[0x1c6]=(fat_partition_start>>0)&0xff;  
+  sector_buffer[0x1c7]=(fat_partition_start>>8)&0xff;  
+  sector_buffer[0x1c8]=(fat_partition_start>>16)&0xff;  
+  sector_buffer[0x1c9]=(fat_partition_start>>24)&0xff;  
+  // LBA size of partition in sectors
+  sector_buffer[0x1ca]=(fat_partition_sectors>>0)&0xff;  
+  sector_buffer[0x1cb]=(fat_partition_sectors>>8)&0xff;  
+  sector_buffer[0x1cc]=(fat_partition_sectors>>16)&0xff;  
+  sector_buffer[0x1cd]=(fat_partition_sectors>>24)&0xff;  
 
   // MBR signature
   sector_buffer[0x1fe]=0x55;
