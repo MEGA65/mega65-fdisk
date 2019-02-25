@@ -326,7 +326,7 @@ void build_mega65_sys_sector(const uint32_t sys_partition_sectors)
     dividing space by (512KB + 128 bytes)*2= ~1025KB.    
   */
   uint16_t i;
-  uint32_t slot_size=512*1024/512;
+  uint32_t slot_size=512*1024/512;  // slot_size units is sectors
   // Take 1MB from partition size, for reserved space when
   // calculating what can fit.
   uint32_t reserved_sectors=1024*1024/512;
