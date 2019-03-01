@@ -256,7 +256,7 @@ void sdcard_readsector(const uint32_t sector_number)
       // Note result
     // result=PEEK(sd_ctl);
 
-    if (!(PEEK(sd_ctl)&0xe7)) {
+    if (!(PEEK(sd_ctl)&0x67)) {
       // Copy data from hardware sector buffer via DMA
       lcopy(sd_sectorbuffer,(long)sector_buffer,512);
   
@@ -360,7 +360,7 @@ void sdcard_writesector(const uint32_t sector_number)
     // Note result
     result=PEEK(sd_ctl);
     
-    if (!(PEEK(sd_ctl)&0xe7)) {
+    if (!(PEEK(sd_ctl)&0x67)) {
       write_count++;
       
       POKE(0xD020,write_count&0x0f);
