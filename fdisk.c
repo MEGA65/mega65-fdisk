@@ -390,6 +390,42 @@ void build_mega65_sys_sector(const uint32_t sys_partition_sectors)
   return;
 }
 
+void build_mega65_sys_config_sector(void)
+{
+  /*
+    Create default valid system configuration sector
+  */
+  
+  // Clear sector
+  clear_sector_buffer();
+
+  // Structure version
+  sector_buffer_write_uint16(0x0101,0);
+  // PAL=$00, NTSC=$80
+  sector_buffer[0x002]=0x80;
+  // Enable audio amp, mono output
+  // XXX - Is mono output now controlled only via audio mixer?
+  sector_buffer[0x003]=0x41;
+  // Use SD card for floppies
+  sector_buffer[0x004]=0x00;
+  // Enable use of Amiga mouses automatically
+  sector_buffer[0x005]=0x01;
+  // Pick an ethernet address 0x006 - 0x00b
+  // XXX - Should do a better job of this!
+  sector_buffer[0x006]=0x41;
+  sector_buffer[0x007]=0x41;
+  sector_buffer[0x008]=0x41;
+  sector_buffer[0x009]=0x41;
+  sector_buffer[0x00A]=0x41;
+  sector_buffer[0x00B]=0x41;
+  // Set name of default disk image
+  lcopy("MEGA65.D81      ",&sector_buffer[0x10],16);
+  // DMAgic to new version (F011B) by default
+  sector_buffer[0x020]=0x01;
+  
+  return;
+}
+
 void show_partition_entry(const char i)
 {
   char j;
@@ -614,6 +650,8 @@ int main(int argc,char **argv)
 #endif
   build_mega65_sys_sector(sys_partition_sectors);
   sdcard_writesector(sys_partition_start);
+  build_mega65_sys_config_sector();
+  sdcard_writesector(sys_partition_start+1);
 
 #ifdef __CC65__
   write_line("Freeze  dir @ $        ",0);
