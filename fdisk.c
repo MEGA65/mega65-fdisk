@@ -10,8 +10,12 @@
   appropriate MBR, DOS Boot Sector, FS Information Sector, FATs and
   root directory, and puts them in place.
 
-  XXX - We should also create the MEGA65 system partitions for
+  Also creates the MEGA65 system partitions for
   installed services, and for task switching.
+
+  XXX - Should initialise the configuration sector in the system partition,
+  so that on first use, you don't get the "CONFIGURATION INVALID" message
+  from the Hypervisor.
 
 */
 

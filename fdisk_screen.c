@@ -192,6 +192,9 @@ void setup_screen(void)
   POKE(0xD020U,0);
   POKE(0xD021U,6);
 
+  // Shove screen right one pixel, as the C65 BASIC does in 80 column mode
+  POKE(0xD016,0xC9);
+  
   // Clear screen RAM
   lfill(SCREEN_ADDRESS,0x20,2000);
 
