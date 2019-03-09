@@ -399,8 +399,9 @@ void build_mega65_sys_config_sector(void)
   // Clear sector
   clear_sector_buffer();
 
-  // Structure version
-  sector_buffer_write_uint16(0x0101,0);
+  // Structure version bytes
+  sector_buffer[0x000]=0x01;
+  sector_buffer[0x001]=0x01;
   // PAL=$00, NTSC=$80
   sector_buffer[0x002]=0x80;
   // Enable audio amp, mono output
@@ -650,8 +651,6 @@ int main(int argc,char **argv)
 #endif
   build_mega65_sys_sector(sys_partition_sectors);
   sdcard_writesector(sys_partition_start);
-  build_mega65_sys_config_sector();
-  sdcard_writesector(sys_partition_start+1);
 
 #ifdef __CC65__
   write_line("Freeze  dir @ $        ",0);
@@ -664,6 +663,10 @@ int main(int argc,char **argv)
   // Erase 1MB reserved area
   write_line("Erasing configuration area",0);
   sdcard_erase(sys_partition_start+1,sys_partition_start+1023);
+
+  // Put a valid first config sector back
+  build_mega65_sys_config_sector();
+  sdcard_writesector(sys_partition_start+1L);  
   
   // erase frozen program directory  
   write_line("Erasing frozen program and system service directories",0);

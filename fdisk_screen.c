@@ -8,7 +8,7 @@ long screen_line_address=SCREEN_ADDRESS;
 char screen_column=0;
 
 unsigned char *footer_messages[FOOTER_MAX+1]={
-  "MEGA65 FDISK+FORMAT V00.06 : (C) COPYRIGHT 2017-2018 PAUL GARDNER-STEPHEN ETC.  ",
+  "MEGA65 FDISK+FORMAT V00.07 : (C) COPYRIGHT 2017-2019 PAUL GARDNER-STEPHEN ETC.  ",
   "                                                                                ",
   "A FATAL ERROR HAS OCCURRED, SORRY.                                              "
 };
