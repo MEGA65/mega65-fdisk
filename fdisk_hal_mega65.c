@@ -469,12 +469,6 @@ void multisector_write_test(void)
   
   lfill((uint32_t)sector_buffer,0,512);
 
-  // Set address of first sector
-  POKE(sd_addr+0,(first_sector>>0)&0xff);
-  POKE(sd_addr+1,(first_sector>>8)&0xff);
-  POKE(sd_addr+2,(first_sector>>16)&0xff);
-  POKE(sd_addr+3,(first_sector>>24)&0xff);
-
   // Read sectors and see what is there already
   verify_errors=0;
   for(n=first_sector;n<=last_sector;n++) {
@@ -490,38 +484,46 @@ void multisector_write_test(void)
 
   POKE(SCREEN_ADDRESS+78,verify_errors);
   
+  // Set address of first sector
+  POKE(sd_addr+0,(first_sector>>0)&0xff);
+  POKE(sd_addr+1,(first_sector>>8)&0xff);
+  POKE(sd_addr+2,(first_sector>>16)&0xff);
+  POKE(sd_addr+3,(first_sector>>24)&0xff);
+
   // First, erase all sectors to all zeroes
   for(n=first_sector;n<=last_sector;n++) {
 
     // Wait for SD card to go ready
     while (PEEK(sd_ctl)&3) continue;
 
-    if (first_sector<last_sector) {
-      if (n==first_sector) {
-	// First sector of multi-sector write
-	POKE(SCREEN_ADDRESS+((n-first_sector)&0xff),4);
-	POKE(sd_ctl,0x04);
-      } else if (n==last_sector) {
-	// Last sector of multi-sector write
-	POKE(SCREEN_ADDRESS+((n-first_sector)&0xff),6);
-	POKE(sd_ctl,0x06);
-      } else {
-	// Middle sector of multi-sector write
-	POKE(SCREEN_ADDRESS+((n-first_sector)&0xff),5);
-	POKE(sd_ctl,0x05);
-      }
-      while (!(PEEK(sd_ctl)&3)) continue;
-      POKE(0xD020U,1);
-
-      while (PEEK(sd_ctl)&3) continue;
-      POKE(0xD020U,0);
-      
+    // Record sector number in start of each sector
+    POKE(sector_buffer+0,n>>0);
+    POKE(sector_buffer+1,n>>8);
+    POKE(sector_buffer+2,n>>16);
+    POKE(sector_buffer+3,n>>24);
+    lcopy((long)sector_buffer,sd_sectorbuffer,512);
+    
+    if (n==first_sector) {
+      // First sector of multi-sector write
+      POKE(SCREEN_ADDRESS+((n-first_sector)&0xff),4);
+      POKE(sd_ctl,0x04);
     } else {
-      // Single sector erase requested, so just do it the old boring way.
-      sdcard_writesector(n);
+      // Subsequent sector of multi-sector write
+      POKE(SCREEN_ADDRESS+((n-first_sector)&0xff),5);
+      lpoke(0xffd3680L,0x05);
+      POKE(sd_ctl,0x05);
     }
+
+    // while (!(PEEK(sd_ctl)&3)) continue;
+    POKE(0xD020U,1);
+    
+    while (PEEK(sd_ctl)&3) continue;
+    POKE(0xD020U,0);
   }
 
+  // End multi-sector write
+  POKE(sd_ctl,0x06);
+  
   // Try to flush cache?
   //  POKE(sd_ctl,0x0c);
   
