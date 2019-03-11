@@ -420,7 +420,7 @@ void build_mega65_sys_config_sector(void)
   sector_buffer[0x00A]=0x41;
   sector_buffer[0x00B]=0x41;
   // Set name of default disk image
-  lcopy("mega65.d81      ",&sector_buffer[0x10],16);
+  lcopy("mega65.d81",&sector_buffer[0x10],10);
   // DMAgic to new version (F011B) by default
   sector_buffer[0x020]=0x01;
   
