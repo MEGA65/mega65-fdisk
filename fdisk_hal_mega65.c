@@ -482,8 +482,6 @@ void multisector_write_test(void)
       }
   }
 
-  POKE(SCREEN_ADDRESS+78,verify_errors);
-  
   // Set address of first sector
   POKE(sd_addr+0,(first_sector>>0)&0xff);
   POKE(sd_addr+1,(first_sector>>8)&0xff);
@@ -491,26 +489,17 @@ void multisector_write_test(void)
   POKE(sd_addr+3,(first_sector>>24)&0xff);
 
   // First, erase all sectors to all zeroes
+  lfill(sd_sectorbuffer,0,512);
   for(n=first_sector;n<=last_sector;n++) {
 
     // Wait for SD card to go ready
     while (PEEK(sd_ctl)&3) continue;
-
-    // Record sector number in start of each sector
-    POKE(sector_buffer+0,n>>0);
-    POKE(sector_buffer+1,n>>8);
-    POKE(sector_buffer+2,n>>16);
-    POKE(sector_buffer+3,n>>24);
-    lcopy((long)sector_buffer,sd_sectorbuffer,512);
     
     if (n==first_sector) {
       // First sector of multi-sector write
-      POKE(SCREEN_ADDRESS+((n-first_sector)&0xff),4);
       POKE(sd_ctl,0x04);
     } else {
       // Subsequent sector of multi-sector write
-      POKE(SCREEN_ADDRESS+((n-first_sector)&0xff),5);
-      lpoke(0xffd3680L,0x05);
       POKE(sd_ctl,0x05);
     }
 
@@ -535,15 +524,64 @@ void multisector_write_test(void)
     POKE(0xD020U,0);
     for(i=0;i<512;i++)
       if (sector_buffer[i]) {
-	POKE(SCREEN_ADDRESS+80+n-first_sector,0x2e);
-	POKE(SCREEN_ADDRESS+2*80+n-first_sector,i&0xff);
 	verify_errors++;
 	break;
       }
     if (i==512) POKE(SCREEN_ADDRESS+80+n-first_sector,0);
   }
 
-  POKE(SCREEN_ADDRESS+79,verify_errors);
+  // Now re-write sectors with sector number marker
+  for(n=first_sector;n<=last_sector;n++) {
+
+    // Wait for SD card to go ready
+    while (PEEK(sd_ctl)&3) continue;
+
+    // Record sector number in start of each sector
+    sector_buffer[0]=n>>0;
+    sector_buffer[1]=n>>8;
+    sector_buffer[2]=n>>16;
+    sector_buffer[3]=n>>24;
+    lcopy((long)sector_buffer,sd_sectorbuffer,512);
+    
+    if (n==first_sector) {
+      // First sector of multi-sector write
+      POKE(sd_ctl,0x04);
+    } else {
+      // Subsequent sector of multi-sector write
+      POKE(sd_ctl,0x05);
+    }
+
+    // while (!(PEEK(sd_ctl)&3)) continue;
+    POKE(0xD020U,1);
+    
+    while (PEEK(sd_ctl)&3) continue;
+    POKE(0xD020U,0);
+  }
+
+  // End multi-sector write
+  POKE(sd_ctl,0x06);
+
+  // Read sectors and see what is there already, checking for the markers we wrote
+  if (!verify_errors) {
+    for(n=first_sector;n<=last_sector;n++) {
+      sdcard_readsector(n);
+      if ((sector_buffer[0]!=((n>>0)&0xff))
+	  ||(sector_buffer[1]!=((n>>8)&0xff))
+	  ||(sector_buffer[2]!=((n>>16)&0xff))
+	  ||(sector_buffer[3]!=((n>>24)&0xff)))
+	{
+	  POKE(SCREEN_ADDRESS+3*80+n-first_sector,0x2e);
+	  POKE(SCREEN_ADDRESS+4*80+n-first_sector,i&0xff);
+	  verify_errors++;
+	}
+      else {
+	POKE(SCREEN_ADDRESS+3*80+n-first_sector,2);
+      }
+    }
+  }
+
+  write_line("##### Errors during bulk-write",0);
+  screen_decimal(screen_line_address-80,verify_errors);
   
   while(1) {
     POKE(0xD020U,PEEK(0xD020U)+1);
