@@ -477,9 +477,7 @@ void multisector_write_test(void)
 
   // Read sectors and see what is there already
   verify_errors=0;
-  // XXX - Go one extra sector for now, until fixed multi-sector write implementation
-  // is synthesised.  
-  for(n=first_sector;n<=(last_sector+1);n++) {
+  for(n=first_sector;n<=last_sector;n++) {
     POKE(0xD020U,1);
     sdcard_readsector(n);
     POKE(0xD020U,0);
