@@ -502,6 +502,9 @@ int main(int argc,char **argv)
   
   sdcard_sectors = sdcard_getsize();
 
+  // Report speed of SD card
+  sdcard_readspeed_test();
+  
   // Show summary of current MBR
   show_mbr();
   
@@ -594,7 +597,6 @@ int main(int argc,char **argv)
     screen_hex(screen_line_address-80+30+2+col,sys_partition_start);
   }
 
-  sdcard_readspeed_test();
   multisector_write_test();
   
   while(1)
