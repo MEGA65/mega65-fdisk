@@ -408,6 +408,149 @@ void sdcard_writesector(const uint32_t sector_number)
   
 }
 
+uint16_t i;
+
+void sdcard_readspeed_test(void)
+{
+  uint32_t n;
+  uint32_t total_time=0;
+  uint8_t last_raster=0;
+  uint16_t speed;
+
+  n=0;
+  for(i=0;i<1000;i++) {
+    POKE(sd_addr+0,(n>>0)&0xff);
+    POKE(sd_addr+1,(n>>8)&0xff);
+    POKE(sd_addr+2,(n>>16)&0xff);
+    POKE(sd_addr+3,(n>>24)&0xff);
+    n+=9873;
+    n&=0xfffff;
+
+    while (PEEK(sd_ctl)&3) continue;
+    POKE(sd_ctl,0x02);
+    while (!(PEEK(sd_ctl)&3)) continue;
+    while (PEEK(sd_ctl)&3) {
+      if (PEEK(0xD012U)!=last_raster) {
+	total_time++;
+	last_raster=PEEK(0xD012U);
+      }
+    }
+
+    POKE(0xD020U,PEEK(0xD020U)+1);
+  }
+
+  // Bus interface makes for an upper limit of about 3MB/sec
+  // Divide total time by 1000 to get # rasters per sector.
+  // Then convert rasters to miliseconds.
+  // 60Hz 800x600 uses ~26 usec per raster.
+  // But our rasters are 2 physical rasters, so ~52 usec per line
+  // Round it to 50 usec for ease of calculation.
+  // A count of 1000 = 50 usec per sector = 10MB/sec
+  // A count of 20000 = 1 msec per sector = 512KB/sec
+  // If it takes 1 raster on average, then the speed is (1sec/50usec) sectors/sec
+  // = 20000 sectors / second = 10MB /sec.
+  // Thus we can call the speed 10000*1000 / rasters*1000
+  // = 10000000 / total_time
+
+  speed = 10000000L / total_time;
+  
+  write_line("SD Card read speed =       KB/sec",0);
+  screen_decimal(screen_line_address-80+21,speed);
+}
+
+void multisector_write_test(void)
+{
+  uint32_t n;
+
+  // Write 17 sectors 
+  uint32_t first_sector=2;
+  uint32_t last_sector=2+64;
+  uint32_t verify_errors=0;
+  
+  lfill((uint32_t)sector_buffer,0,512);
+
+  // Set address of first sector
+  POKE(sd_addr+0,(first_sector>>0)&0xff);
+  POKE(sd_addr+1,(first_sector>>8)&0xff);
+  POKE(sd_addr+2,(first_sector>>16)&0xff);
+  POKE(sd_addr+3,(first_sector>>24)&0xff);
+
+  // Read sectors and see what is there already
+  verify_errors=0;
+  // XXX - Go one extra sector for now, until fixed multi-sector write implementation
+  // is synthesised.  
+  for(n=first_sector;n<=(last_sector+1);n++) {
+    POKE(0xD020U,1);
+    sdcard_readsector(n);
+    POKE(0xD020U,0);
+    for(i=0;i<512;i++)
+      if (sector_buffer[i]) {
+	verify_errors++;
+	break;
+      }
+  }
+
+  POKE(SCREEN_ADDRESS+78,verify_errors);
+  
+  // First, erase all sectors to all zeroes
+  for(n=first_sector;n<=last_sector;n++) {
+
+    // Wait for SD card to go ready
+    while (PEEK(sd_ctl)&3) continue;
+
+    if (first_sector<last_sector) {
+      if (n==first_sector) {
+	// First sector of multi-sector write
+	POKE(SCREEN_ADDRESS+((n-first_sector)&0xff),4);
+	POKE(sd_ctl,0x04);
+      } else if (n==last_sector) {
+	// Last sector of multi-sector write
+	POKE(SCREEN_ADDRESS+((n-first_sector)&0xff),6);
+	POKE(sd_ctl,0x06);
+      } else {
+	// Middle sector of multi-sector write
+	POKE(SCREEN_ADDRESS+((n-first_sector)&0xff),5);
+	POKE(sd_ctl,0x05);
+      }
+      while (!(PEEK(sd_ctl)&3)) continue;
+      POKE(0xD020U,1);
+
+      while (PEEK(sd_ctl)&3) continue;
+      POKE(0xD020U,0);
+      
+    } else {
+      // Single sector erase requested, so just do it the old boring way.
+      sdcard_writesector(n);
+    }
+  }
+
+  // Try to flush cache?
+  //  POKE(sd_ctl,0x0c);
+  
+  // Read sectors and see what is there already
+  verify_errors=0;
+  for(n=first_sector;n<=last_sector;n++) {
+    POKE(0xD020U,1);
+    sdcard_readsector(n);
+    POKE(0xD020U,0);
+    for(i=0;i<512;i++)
+      if (sector_buffer[i]) {
+	POKE(SCREEN_ADDRESS+80+n-first_sector,0x2e);
+	POKE(SCREEN_ADDRESS+2*80+n-first_sector,i&0xff);
+	verify_errors++;
+	break;
+      }
+    if (i==512) POKE(SCREEN_ADDRESS+80+n-first_sector,0);
+  }
+
+  POKE(SCREEN_ADDRESS+79,verify_errors);
+  
+  while(1) {
+    POKE(0xD020U,PEEK(0xD020U)+1);
+  }
+  
+}
+
 void sdcard_erase(const uint32_t first_sector,const uint32_t last_sector)
 {
   uint32_t n;
@@ -415,8 +558,44 @@ void sdcard_erase(const uint32_t first_sector,const uint32_t last_sector)
 
   //  fprintf(stderr,"ERASING SECTORS %d..%d\r\n",first_sector,last_sector);
 
+#ifndef NOFAST_ERASE
+  POKE(sd_addr+0,(first_sector>>0)&0xff);
+  POKE(sd_addr+1,(first_sector>>8)&0xff);
+  POKE(sd_addr+2,(first_sector>>16)&0xff);
+  POKE(sd_addr+3,(first_sector>>24)&0xff);
+#endif   
+  
   for(n=first_sector;n<=last_sector;n++) {
+
+#ifndef NOFAST_ERASE
+    // Wait for SD card to go ready
+    while (PEEK(sd_ctl)&3) continue;
+
+    if (first_sector<last_sector) {
+      if (n==first_sector) {
+	// First sector of multi-sector write
+	POKE(SCREEN_ADDRESS+((n-first_sector)&0xff),4);
+	POKE(sd_ctl,0x04);
+      } else if (n==last_sector) {
+	// Last sector of multi-sector write
+	POKE(SCREEN_ADDRESS+((n-first_sector)&0xff),6);
+	POKE(sd_ctl,0x06);
+      } else {
+	// Middle sector of multi-sector write
+	POKE(SCREEN_ADDRESS+((n-first_sector)&0xff),5);
+	POKE(sd_ctl,0x05);
+      }
+      POKE(0xD020U,1);
+      while (PEEK(sd_ctl)&3) continue;
+      POKE(0xD020U,0);
+    } else {
+      // Single sector erase requested, so just do it the old boring way.
+      sdcard_writesector(n);
+    }
+#else
     sdcard_writesector(n);
+#endif
+    
     // Show count-down
     screen_decimal(screen_line_address,last_sector-n);
     //    fprintf(stderr,"."); fflush(stderr);

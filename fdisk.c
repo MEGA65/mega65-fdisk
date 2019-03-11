@@ -564,7 +564,7 @@ int main(int argc,char **argv)
 	  fs_clusters,fs_clusters,fat_sectors,reserved_sectors);
 #else
   write_line(" ",0);
-  write_line("Format SD Card with new partition table and FAT32 file fystem?",0);
+  write_line("Format SD Card with new partition table and FAT32 file system?",0);
   recolour_last_line(7);
   {
     char col=6;
@@ -594,6 +594,9 @@ int main(int argc,char **argv)
     screen_hex(screen_line_address-80+30+2+col,sys_partition_start);
   }
 
+  sdcard_readspeed_test();
+  multisector_write_test();
+  
   while(1)
   {
     char line_of_input[80];
