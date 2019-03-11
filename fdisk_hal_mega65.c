@@ -282,6 +282,10 @@ void sdcard_writesector(const uint32_t sector_number)
   int i;
   char tries=0,result;
   uint16_t counter=0;
+
+  while (PEEK(sd_ctl)&3) {
+    continue;
+  }
   
   // Set address to read/write
   POKE(sd_ctl,1); // end reset
@@ -458,6 +462,7 @@ void sdcard_readspeed_test(void)
   screen_decimal(screen_line_address-80+21,speed);
 }
 
+#if 0
 void multisector_write_test(void)
 {
   uint32_t n;
@@ -512,6 +517,12 @@ void multisector_write_test(void)
 
   // End multi-sector write
   POKE(sd_ctl,0x06);
+
+  // Wait for SD card to go busy
+  while (!(PEEK(sd_ctl)&3)) continue;
+  
+  // Wait for SD card to go ready
+  while (PEEK(sd_ctl)&3) continue;
   
   // Try to flush cache?
   //  POKE(sd_ctl,0x0c);
@@ -570,6 +581,12 @@ void multisector_write_test(void)
   // End multi-sector write
   POKE(sd_ctl,0x06);
 
+  // Wait for SD card to go busy
+  while (!(PEEK(sd_ctl)&3)) continue;
+  
+  // Wait for SD card to go ready
+  while (PEEK(sd_ctl)&3) continue;
+  
   // Read sectors and see what is there already, checking for the markers we wrote
   if (!verify_errors) {
     for(n=first_sector;n<=last_sector;n++) {
@@ -597,6 +614,7 @@ void multisector_write_test(void)
   }
   
 }
+#endif
 
 void sdcard_erase(const uint32_t first_sector,const uint32_t last_sector)
 {
@@ -618,27 +636,19 @@ void sdcard_erase(const uint32_t first_sector,const uint32_t last_sector)
     // Wait for SD card to go ready
     while (PEEK(sd_ctl)&3) continue;
 
-    if (first_sector<last_sector) {
-      if (n==first_sector) {
-	// First sector of multi-sector write
-	POKE(SCREEN_ADDRESS+((n-first_sector)&0xff),4);
-	POKE(sd_ctl,0x04);
-      } else if (n==last_sector) {
-	// Last sector of multi-sector write
-	POKE(SCREEN_ADDRESS+((n-first_sector)&0xff),6);
-	POKE(sd_ctl,0x06);
-      } else {
-	// Middle sector of multi-sector write
-	POKE(SCREEN_ADDRESS+((n-first_sector)&0xff),5);
-	POKE(sd_ctl,0x05);
-      }
-      POKE(0xD020U,1);
-      while (PEEK(sd_ctl)&3) continue;
-      POKE(0xD020U,0);
-    } else {
-      // Single sector erase requested, so just do it the old boring way.
-      sdcard_writesector(n);
-    }
+    if (n==first_sector) {
+      // First sector of multi-sector write
+      POKE(sd_ctl,0x04);
+    } else
+      // All other sectors
+      POKE(sd_ctl,0x05);
+
+    // Wait for SD card to go busy
+    while (!(PEEK(sd_ctl)&3)) continue;
+
+    // Wait for SD card to go ready
+    while (PEEK(sd_ctl)&3) continue;
+       
 #else
     sdcard_writesector(n);
 #endif
@@ -647,5 +657,19 @@ void sdcard_erase(const uint32_t first_sector,const uint32_t last_sector)
     screen_decimal(screen_line_address,last_sector-n);
     //    fprintf(stderr,"."); fflush(stderr);
   }
+
+#ifndef NOFAST_ERASE
+  // Then say when we are done
+  POKE(sd_ctl,0x06);
+  
+  // Wait for SD card to go busy
+  while (!(PEEK(sd_ctl)&3)) continue;
+  
+  // Wait for SD card to go ready
+  while (PEEK(sd_ctl)&3) continue;
+
+  usleep(5000000);
+  
+#endif    
   
 }

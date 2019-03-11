@@ -597,7 +597,7 @@ int main(int argc,char **argv)
     screen_hex(screen_line_address-80+30+2+col,sys_partition_start);
   }
 
-  multisector_write_test();
+  //  multisector_write_test();
   
   while(1)
   {
@@ -669,6 +669,8 @@ int main(int argc,char **argv)
   write_line("Erasing configuration area",0);
   sdcard_erase(sys_partition_start+1,sys_partition_start+1023);
 
+  write_line("Erased.",0);
+  
   // Put a valid first config sector back
   build_mega65_sys_config_sector();
   sdcard_writesector(sys_partition_start+1L);  
