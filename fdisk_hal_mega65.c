@@ -467,8 +467,6 @@ void multisector_write_test(void)
   uint32_t last_sector=2+64;
   uint32_t verify_errors=0;
   
-  lfill((uint32_t)sector_buffer,0,512);
-
   // Read sectors and see what is there already
   verify_errors=0;
   for(n=first_sector;n<=last_sector;n++) {
@@ -489,7 +487,9 @@ void multisector_write_test(void)
   POKE(sd_addr+3,(first_sector>>24)&0xff);
 
   // First, erase all sectors to all zeroes
-  lfill(sd_sectorbuffer,0,512);
+  lfill((uint32_t)sector_buffer,0,512);
+  lcopy((long)sector_buffer,sd_sectorbuffer,512);
+
   for(n=first_sector;n<=last_sector;n++) {
 
     // Wait for SD card to go ready
@@ -530,7 +530,15 @@ void multisector_write_test(void)
     if (i==512) POKE(SCREEN_ADDRESS+80+n-first_sector,0);
   }
 
+  // Set address of first sector
+  POKE(sd_addr+0,(first_sector>>0)&0xff);
+  POKE(sd_addr+1,(first_sector>>8)&0xff);
+  POKE(sd_addr+2,(first_sector>>16)&0xff);
+  POKE(sd_addr+3,(first_sector>>24)&0xff);
+  
   // Now re-write sectors with sector number marker
+  lfill((uint32_t)sector_buffer,0x55,512);
+  lcopy((long)sector_buffer,sd_sectorbuffer,512);
   for(n=first_sector;n<=last_sector;n++) {
 
     // Wait for SD card to go ready
@@ -542,6 +550,7 @@ void multisector_write_test(void)
     sector_buffer[2]=n>>16;
     sector_buffer[3]=n>>24;
     lcopy((long)sector_buffer,sd_sectorbuffer,512);
+    POKE(SCREEN_ADDRESS+10*80+n-first_sector,lpeek(sd_sectorbuffer));
     
     if (n==first_sector) {
       // First sector of multi-sector write
@@ -577,8 +586,8 @@ void multisector_write_test(void)
       else {
 	POKE(SCREEN_ADDRESS+3*80+n-first_sector,2);
       }
-    }
-  }
+    }    
+  } else POKE(0xD021U,0);
 
   write_line("##### Errors during bulk-write",0);
   screen_decimal(screen_line_address-80,verify_errors);
