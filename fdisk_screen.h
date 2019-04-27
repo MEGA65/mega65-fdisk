@@ -50,7 +50,7 @@ void screen_decimal(unsigned int addr,unsigned int value);
 void set_screen_attributes(long p,unsigned char count,unsigned char attr);
 void write_line(char *s,char col);
 void recolour_last_line(char colour);
-char read_line(char *buffer,char maxlen);
+char read_line(char *buffer,unsigned char maxlen);
 
 void format_decimal(const int addr,const int value, const char columns);
 void format_hex(const int addr,const long value, const char columns);

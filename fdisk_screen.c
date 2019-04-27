@@ -2,11 +2,18 @@
 #include "fdisk_memory.h"
 #include "ascii.h"
 
+#ifndef __CC65__
+#include <stdio.h>
+#include <strings.h>
+#include <string.h>
+#endif
+
 extern unsigned char *charset;
 
 long screen_line_address=SCREEN_ADDRESS;
 char screen_column=0;
 
+#ifdef __CC65__
 unsigned char *footer_messages[FOOTER_MAX+1]={
   "MEGA65 FDISK+FORMAT V00.08 : (C) COPYRIGHT 2017-2019 PAUL GARDNER-STEPHEN ETC.  ",
   "                                                                                ",
@@ -55,7 +62,7 @@ void format_hex(const int addr,const long value, const char columns)
   }
   for(i=0;i<columns;i++) lpoke(addr+i,dec[i]);
 }
-
+#endif
 
 unsigned char screen_decimal_digits[16][5]={
   {0,0,0,0,1},
@@ -78,6 +85,7 @@ unsigned char screen_decimal_digits[16][5]={
 
 void write_line(char *s,char col)
 {
+#ifdef __CC65__
   char len=0;
   while(s[len]) len++;
   lcopy((long)&s[0],screen_line_address+col,len);
@@ -89,8 +97,13 @@ void write_line(char *s,char col)
     lfill(SCREEN_ADDRESS+23*80,' ',80);
     lfill(COLOUR_RAM_ADDRESS+23*80,1,80);
   }
+#else
+  for(int i=0;i<col;i++) fprintf(stdout," ");
+  fprintf(stdout,"%s\n",s);
+#endif
 }
 
+#ifdef __CC65__
 void recolour_last_line(char colour)
 {
   long colour_address=COLOUR_RAM_ADDRESS+(screen_line_address-SCREEN_ADDRESS)-80;
@@ -161,7 +174,13 @@ void display_footer(unsigned char index)
   lcopy(addr,FOOTER_ADDRESS,80);
   set_screen_attributes(FOOTER_ADDRESS,80,ATTRIB_REVERSE);
 }
+#endif
 
+#ifndef __CC65__
+void setup_screen(void)
+{
+}
+#else
 void setup_screen(void)
 {
   unsigned char v;
@@ -210,6 +229,7 @@ void setup_screen(void)
 
   display_footer(FOOTER_COPYRIGHT);    
 }
+#endif
 
 void screen_colour_line(unsigned char line,unsigned char colour)
 {
@@ -242,6 +262,7 @@ void set_screen_attributes(long p,unsigned char count,unsigned char attr)
   }
 }
 
+#ifdef __CC65__
 char read_line(char *buffer,unsigned char maxlen)
 {
   char len=0;
@@ -317,3 +338,10 @@ char read_line(char *buffer,unsigned char maxlen)
 
   return len;
 }
+#else
+char read_line(char *buffer,unsigned char maxlen)
+{
+	fgets(buffer,maxlen,stdin);
+ 	return strlen(buffer);
+}
+#endif

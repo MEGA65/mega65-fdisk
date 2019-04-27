@@ -52,6 +52,9 @@ pngprepare:	pngprepare.c
 m65fdisk.prg:	$(ASSFILES) $(DATAFILES) $(CL65)
 	$(CL65) $(COPTS) $(LOPTS) -vm -m m65fdisk.map -o m65fdisk.prg $(ASSFILES)
 
+m65fdisk:	$(M65IDESOURCES) $(HEADERS) Makefile
+	gcc -Wall -Wno-char-subscripts -o m65fdisk asciih.c fdisk.c fdisk_fat32.c fdisk_hal_unix.c fdisk_memory.c fdisk_screen.c
+
 clean:
 	rm -f $(FILES)
 

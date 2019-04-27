@@ -420,7 +420,12 @@ void build_mega65_sys_config_sector(void)
   sector_buffer[0x00A]=0x41;
   sector_buffer[0x00B]=0x41;
   // Set name of default disk image
+#ifdef __CC65__
   lcopy("mega65.d81",&sector_buffer[0x10],10);
+#else
+  bcopy("mega65.d81",&sector_buffer[0x10],10);
+#endif
+  
   // DMAgic to new version (F011B) by default
   sector_buffer[0x020]=0x01;
   
@@ -430,9 +435,11 @@ void build_mega65_sys_config_sector(void)
 void show_partition_entry(const char i)
 {
   char j;
+#ifdef __CC65__
   char report[80]="$$* : Start=%%%/%%/%%%% or $$$$$$$$ / End=%%%/%%/%%%% or $$$$$$$$";
+#endif
   
-  int offset=0x1be+(i<<4);
+  int offset=0x1be + (i<<4);
 
   char active=sector_buffer[offset+0];
   char shead=sector_buffer[offset+1];
@@ -446,7 +453,8 @@ void show_partition_entry(const char i)
 
   for(j=0;j<4;j++) ((char *)&lba_start)[j]=sector_buffer[offset+8+j];
   for(j=0;j<4;j++) ((char *)&lba_end)[j]=sector_buffer[offset+12+j];
-  
+ 
+#ifdef __CC65__ 
   format_hex((int)report+0,id,2);
   if (!(active&0x80)) report[2]=' '; // not active
 
@@ -461,6 +469,11 @@ void show_partition_entry(const char i)
   format_hex((int)report+57,lba_end,8);
 
   write_line(report,0);
+#else
+  printf("%02X%c : Start=%3d/%2d/%4d or %08X / End=%3d/%2d/%4d or %08Xn",
+	id,active&80?'*':' ',
+	shead,ssector,scylinder,lba_start,ehead,esector,ecylinder,lba_end);
+#endif
   
 }
 
@@ -518,8 +531,8 @@ int main(int argc,char **argv)
   // Simple solution for now: Use 1/2 disk for system partition, or 2GiB, whichever
   // is smaller.
   sys_partition_sectors=(sdcard_sectors-0x0800)>>1;
-  if (sys_partition_sectors>(2*1024*1024*1024/512))
-    sys_partition_sectors=(2*1024*1024*1024/512);
+  if (sys_partition_sectors>(2*1024*(1024*1024/512)))
+    sys_partition_sectors=(2*1024*(1024*1024/512));
   sys_partition_sectors&=0xfffff800; // round down to nearest 1MB boundary
   fat_partition_sectors=sdcard_sectors-0x800-sys_partition_sectors;
 
@@ -753,19 +766,25 @@ int main(int argc,char **argv)
 						fat_partition_start+fat2_sector);
       if (first_sector) {
 	// Write out ROM sectors
+#ifdef __CC65__
 	unsigned long addr;
 	for(addr=0x20000;addr<=0x40000;addr+=512)
 	  {
 	    lcopy(addr,sector_buffer,512);
 	    sdcard_writesector(first_sector+(addr-0x20000)/512);
 	  }
+#else
+	// XXX - Read ROM file from file system and write it out
+#endif
 	write_line("Completed writing ROM",0);
       }
     } else {
+#ifdef __CC65__
     write_line("No ROM currently loaded (SIG=$$$$$$$).",0);
     screen_hex_byte(screen_line_address-80+30,lpeek(0x2a004));
     screen_hex_byte(screen_line_address-80+32,lpeek(0x2a005));
     screen_hex_byte(screen_line_address-80+34,lpeek(0x2a006));
+#endif
   }
   
   

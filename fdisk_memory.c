@@ -31,6 +31,7 @@ struct dmagic_dmalist {
 struct dmagic_dmalist dmalist;
 unsigned char dma_byte;
 
+#ifdef __CC65__
 void do_dma(void)
 {
   unsigned char i;
@@ -151,3 +152,8 @@ void m65_io_enable(void)
   // Force to full speed
   POKE(0,65);
 }
+#else
+void m65_io_enable(void)
+{
+}
+#endif
