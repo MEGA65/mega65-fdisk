@@ -31,6 +31,7 @@ long fat32_create_contiguous_file(char *name, long size,
   char message[40]="Found file: ????????.???";
 
   clusters=size/4096;
+  if (size&4095) clusters++;
 
   for(fat_offset=0;fat_offset <= (fat2_sector-fat1_sector); fat_offset++) {
     sdcard_readsector(fat1_sector+fat_offset);
@@ -41,12 +42,6 @@ long fat32_create_contiguous_file(char *name, long size,
     int j;
     for(j=0;j<512;j++) if (sector_buffer[j]) break;
     if (j!=512) {
-      printf("FAT sector #%d\n",fat_offset);
-      for(j=0;j<512;j++)
-	{
-	  printf(" %02x",sector_buffer[j]);
-	  if ((j&0x1f)==0x1f) printf("\n");
-	}
       continue;
     }
     
@@ -69,6 +64,7 @@ long fat32_create_contiguous_file(char *name, long size,
 	    // End of chain marker
 	    sector_buffer[offset+0]=0xff; sector_buffer[offset+1]=0xff;
 	    sector_buffer[offset+2]=0xff; sector_buffer[offset+3]=0x0f;
+	    printf("Found enough contiguous clusters\n");
 	    break;
 	  } else {
 	    // Point to next cluster
