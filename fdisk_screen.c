@@ -6,6 +6,8 @@
 #include <stdio.h>
 #include <strings.h>
 #include <string.h>
+#include <stdlib.h>
+#include <unistd.h>
 #endif
 
 extern unsigned char *charset;
@@ -229,7 +231,6 @@ void setup_screen(void)
 
   display_footer(FOOTER_COPYRIGHT);    
 }
-#endif
 
 void screen_colour_line(unsigned char line,unsigned char colour)
 {
@@ -237,9 +238,11 @@ void screen_colour_line(unsigned char line,unsigned char colour)
   // (use bit-shifting as fast alternative to multiply)
   lfill(0x1f800+(line<<6)+(line<<4),colour,80);
 }
+#endif
 
 unsigned char i;
 
+#ifdef __CC65__
 void fatal_error(unsigned char *filename, unsigned int line_number)
 {
   display_footer(FOOTER_FATAL);
@@ -249,7 +252,15 @@ void fatal_error(unsigned char *filename, unsigned int line_number)
   lfill(COLOUR_RAM_ADDRESS-SCREEN_ADDRESS+FOOTER_ADDRESS,2|ATTRIB_REVERSE,80);
   for(;;) continue;
 }
+#else
+void fatal_error(unsigned char *filename, unsigned int line_number)
+{
+  fprintf(stderr,"%s:%d: Fatal error encountered.\n",filename,line_number);
+  exit(-1);
+}
+#endif
 
+#ifdef __CC65__
 void set_screen_attributes(long p,unsigned char count,unsigned char attr)
 {
   // This involves setting colour RAM values, so we need to either LPOKE, or
@@ -262,7 +273,6 @@ void set_screen_attributes(long p,unsigned char count,unsigned char attr)
   }
 }
 
-#ifdef __CC65__
 char read_line(char *buffer,unsigned char maxlen)
 {
   char len=0;

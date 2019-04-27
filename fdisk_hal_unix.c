@@ -7,6 +7,10 @@
 
 FILE *sdcard=NULL;
 
+void sdcard_readspeed_test(void)
+{
+}
+
 void mega65_fast(void)
 {
 }

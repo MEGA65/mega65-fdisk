@@ -350,10 +350,13 @@ void build_mega65_sys_sector(const uint32_t sys_partition_sectors)
   // System service directory begins after that
   sys_partition_service_dir=
     sys_partition_freeze_dir+slot_size*slot_count;
-  
+ 
+#ifdef __CC65__ 
   write_line("      Freeze and OS Service slots.",0);
   screen_decimal(screen_line_address-80,slot_count);
-  
+#else
+  fprintf(stdout," %5d Freeze and OS Service slots\n",slot_count);
+#endif
   
   // Clear sector
   clear_sector_buffer();
@@ -748,6 +751,7 @@ int main(int argc,char **argv)
     sdcard_erase(fat_partition_start+rootdir_sector+1,fat_partition_start+rootdir_sector+1+sectors_per_cluster-1);
 #endif
 
+#ifdef __CC65__
   // Write current rom to MEGA65.ROM on the FAT32 file system
   // (This is as a convenience during development, where I end up formatting the SD card a lot, and it is a pain
   // to have to remove the SD card to put the ROM back on each time)
@@ -766,26 +770,23 @@ int main(int argc,char **argv)
 						fat_partition_start+fat2_sector);
       if (first_sector) {
 	// Write out ROM sectors
-#ifdef __CC65__
 	unsigned long addr;
 	for(addr=0x20000;addr<=0x40000;addr+=512)
 	  {
 	    lcopy(addr,sector_buffer,512);
 	    sdcard_writesector(first_sector+(addr-0x20000)/512);
 	  }
-#else
-	// XXX - Read ROM file from file system and write it out
-#endif
 	write_line("Completed writing ROM",0);
       }
     } else {
-#ifdef __CC65__
     write_line("No ROM currently loaded (SIG=$$$$$$$).",0);
     screen_hex_byte(screen_line_address-80+30,lpeek(0x2a004));
     screen_hex_byte(screen_line_address-80+32,lpeek(0x2a005));
     screen_hex_byte(screen_line_address-80+34,lpeek(0x2a006));
-#endif
   }
+#else
+	// Process loading and reading of files from disk image
+#endif
   
   
 #ifdef __CC65__

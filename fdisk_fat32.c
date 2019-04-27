@@ -38,8 +38,10 @@ long fat32_create_contiguous_file(char *name, long size,
       next_cluster|=((long)sector_buffer[offset+1]<<8L);
       next_cluster|=((long)sector_buffer[offset+2]<<16L);
       next_cluster|=((long)sector_buffer[offset+3]<<24L);
+#ifdef __CC65__
       screen_decimal(screen_line_address-80+8,offset/4);
       screen_hex(screen_line_address-80+32,next_cluster);
+#endif
       if (!next_cluster) {
 	if (!start_cluster) {
 	  start_cluster=offset/4;
@@ -66,8 +68,12 @@ long fat32_create_contiguous_file(char *name, long size,
     write_line("ERROR: Could not find enough free clusters early in file system",0);
     return 0;
   }
+#ifdef __CC65__
   write_line("First free cluster is ",0);
   screen_decimal(screen_line_address-80+22,start_cluster);
+#else
+  fprintf(stdout,"First free cluster is #%ld\n",start_cluster);
+#endif
 
   // Commit sector to disk (in both copies of FAT)
   sdcard_writesector(fat1_sector);
