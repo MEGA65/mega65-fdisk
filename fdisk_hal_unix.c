@@ -7,6 +7,12 @@
 
 FILE *sdcard=NULL;
 
+void sdcard_readsector(const uint32_t sector_number)
+{
+  fseek(sdcard,sector_number*512LL,SEEK_SET);
+  fread(sector_buffer,512,1,sdcard);
+}
+
 void sdcard_readspeed_test(void)
 {
 }
