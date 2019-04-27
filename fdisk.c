@@ -21,6 +21,12 @@
 
 #include <stdio.h>
 #include <string.h>
+#ifndef __CC65__
+#include <unistd.h>
+#include <stdlib.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#endif
 
 #include "fdisk_hal.h"
 #include "fdisk_memory.h"
@@ -788,7 +794,53 @@ int main(int argc,char **argv)
     screen_hex_byte(screen_line_address-80+34,lpeek(0x2a006));
   }
 #else
-	// Process loading and reading of files from disk image
+
+  // Process loading and reading of files from disk image
+  printf("Processing %d arguments.\n",argc);
+  for (int i=1;i<argc;i++) {
+    struct stat st;
+    fprintf(stdout,"Writing file %s to SD card image\n",argv[i]);
+    stat(argv[i],&st);
+    
+    FILE *f=fopen(argv[i],"r");
+    if (!f) {
+      fprintf(stderr,"Could not open file for reading\n");
+      exit(-1);
+    }
+    
+    char dosname[12];
+    char name[1024],extension[1024];
+    bzero(name,sizeof(name));
+    bzero(extension,sizeof(extension));
+    if (sscanf(argv[i],"%[^.].%s",name,extension)!=2) {
+      fprintf(stderr,"Could notparse name and extension from file name\n");
+      exit(-1);
+    }
+    if (name[8]||extension[3]) {
+      fprintf(stderr,"filename or extension too long. Must fit in 8.3 DOS filename. Got '%s'.'%s'\n",name,extension);
+      exit(-1);
+    }
+    snprintf(dosname,12,"%-8s%-3s",name,extension);
+    // make dos name upper case
+    for(int i=0;i<12;i++) if (dosname[i]>='a'&&dosname[i]<='z') dosname[i]-=0x20;
+    
+    unsigned int first_sector=fat32_create_contiguous_file(dosname,st.st_size,
+							   fat_partition_start+rootdir_sector,
+							   fat_partition_start+fat1_sector,
+							   fat_partition_start+fat2_sector);
+    if (first_sector) {
+      // Write out sectors
+      unsigned long addr;
+      for(addr=0;addr<=st.st_size;addr+=512)
+	{
+	  fread(sector_buffer,1,512,f);
+	  sdcard_writesector(first_sector+(addr/512));
+	}
+      
+    }
+    fclose(f);
+    printf("File written.\n");
+  }
 #endif
   
   
