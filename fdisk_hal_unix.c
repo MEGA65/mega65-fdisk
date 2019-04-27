@@ -64,7 +64,7 @@ void sdcard_writesector(const uint32_t sector_number)
 void sdcard_erase(const uint32_t first_sector,const uint32_t last_sector)
 {
   uint32_t n;
-  bzero(sector_buffer,sizeof(512));
+  bzero(sector_buffer,512);
 
   fprintf(stderr,"Erasing sectors %d..%d\n",first_sector,last_sector);
   
