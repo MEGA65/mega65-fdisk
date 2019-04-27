@@ -588,6 +588,16 @@ int main(int argc,char **argv)
   fs_data_sectors=fs_clusters*sectors_per_cluster;
 
 #ifndef __CC65__
+  printf("Type DELETE EVERYTHING to delete everything.\n");
+  char line[1024];
+  fgets(line,1024,stdin);
+  while (line[0]&&line[strlen(line)-1]=='\n') line[strlen(line)-1]=0;
+  while (line[0]&&line[strlen(line)-1]=='\r') line[strlen(line)-1]=0;
+  if (strcmp(line,"DELETE EVERYTHING")) {
+    fprintf(stderr,"String did not match -- aborting.\n");
+    exit(-1);
+  }
+
   fprintf(stderr,"Creating File System with %u (0x%x) CLUSTERS, %d SECTORS PER FAT, %d RESERVED SECTORS.\r\n",
 	  fs_clusters,fs_clusters,fat_sectors,reserved_sectors);
 #else
