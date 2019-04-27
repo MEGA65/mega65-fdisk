@@ -20,3 +20,6 @@ fdisk_fat32.o
 fdisk_fat32.s
 vivado_lab.jou
 vivado_lab.log
+MEGA65.ROM
+sdcard.img
+m65fdisk

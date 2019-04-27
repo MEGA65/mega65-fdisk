@@ -28,6 +28,7 @@ long fat32_create_contiguous_file(char *name, long size,
   unsigned long next_cluster;
   unsigned long contiguous_clusters=0;
   unsigned int fat_offset=0;
+  int j;
   char message[40]="Found file: ????????.???";
 
   clusters=size/4096;
@@ -39,7 +40,6 @@ long fat32_create_contiguous_file(char *name, long size,
     start_cluster=0;
 
     // Skip any FAT sectors with allocated clusters
-    int j;
     for(j=0;j<512;j++) if (sector_buffer[j]) break;
     if (j!=512) {
       continue;
@@ -64,7 +64,9 @@ long fat32_create_contiguous_file(char *name, long size,
 	    // End of chain marker
 	    sector_buffer[offset+0]=0xff; sector_buffer[offset+1]=0xff;
 	    sector_buffer[offset+2]=0xff; sector_buffer[offset+3]=0x0f;
+#ifndef __CC65__
 	    printf("Found enough contiguous clusters\n");
+#endif
 	    break;
 	  } else {
 	    // Point to next cluster
@@ -83,8 +85,10 @@ long fat32_create_contiguous_file(char *name, long size,
 
     if (start_cluster&&(contiguous_clusters==clusters)) break;
     else {
-      printf("FAT sector #%d : start_cluster=%d, contigous_clusters=%d\n",
+#ifndef __CC65__
+      printf("FAT sector #%d : start_cluster=%ld, contigous_clusters=%ld\n",
 	     fat_offset,start_cluster,contiguous_clusters);
+#endif
     }
   }
   if ((!start_cluster)||(contiguous_clusters!=clusters)) {
@@ -133,6 +137,8 @@ long fat32_create_contiguous_file(char *name, long size,
 
   sdcard_writesector(root_dir_sector);
 
-  printf("Found space starting at cluster %d\n",start_cluster);
+#ifndef __CC65__
+  printf("Found space starting at cluster %ld\n",start_cluster);
+#endif
   return root_dir_sector+(start_cluster-2)*8;
 }
