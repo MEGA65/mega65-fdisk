@@ -482,7 +482,7 @@ void show_partition_entry(const char i)
 
   write_line(report,0);
 #else
-  printf("%02X%c : Start=%3d/%2d/%4d or %08X / End=%3d/%2d/%4d or %08Xn",
+  printf("%02X%c : Start=%3d/%2d/%4d or %08X / End=%3d/%2d/%4d or %08X\n",
 	id,active&80?'*':' ',
 	shead,ssector,scylinder,lba_start,ehead,esector,ecylinder,lba_end);
 #endif
