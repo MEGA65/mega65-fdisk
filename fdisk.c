@@ -790,10 +790,10 @@ int main(int argc,char **argv)
       if (first_sector) {
 	// Write out ROM sectors
 	unsigned long addr;
-	for(addr=0x20000;addr<=0x40000;addr+=512)
+	for(addr=0x20000;addr<=0x40000L;addr+=512)
 	  {
 	    lcopy(addr,sector_buffer,512);
-	    sdcard_writesector(first_sector+(addr-0x20000)/512);
+	    sdcard_writesector(first_sector+(addr-0x20000L)/512);
 	  }
 	write_line("Completed writing ROM",0);
       }
@@ -803,6 +803,29 @@ int main(int argc,char **argv)
     screen_hex_byte(screen_line_address-80+32,lpeek(0x2a005));
     screen_hex_byte(screen_line_address-80+34,lpeek(0x2a006));
   }
+
+  // Look for freezer pre-installed in RAM, and write it out if present.
+   if ((lpeek(0x12000)==0x01)&&(lpeek(0x12001L)==0x01))
+    {
+      unsigned long first_sector;
+      write_line("Writing FREEZER.M65 to FAT32 file system",0);
+
+      first_sector=fat32_create_contiguous_file("FREEZERM65",0x0E000L,
+                                                fat_partition_start+rootdir_sector,
+                                                fat_partition_start+fat1_sector,
+                                                fat_partition_start+fat2_sector);
+      if (first_sector) {
+        // Write out sectors
+        unsigned long addr;
+        for(addr=0x12000L;addr<=0x20000L;addr+=512)
+          {
+            lcopy(addr,sector_buffer,512);
+            sdcard_writesector(first_sector+(addr-0x12000)/512);
+          }
+        write_line("Completed writing FREEZER.M65",0);
+      }
+    }   
+
 #else
 
   // Process loading and reading of files from disk image
