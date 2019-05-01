@@ -105,8 +105,8 @@ long fat32_create_contiguous_file(char *name, long size,
 #endif
 
   // Commit sector to disk (in both copies of FAT)
-  sdcard_writesector(fat1_sector);
-  sdcard_writesector(fat2_sector);
+  sdcard_writesector(fat1_sector+fat_offset);
+  sdcard_writesector(fat2_sector+fat_offset);
   
   sdcard_readsector(root_dir_sector);
   
