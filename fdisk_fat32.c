@@ -70,7 +70,7 @@ long fat32_create_contiguous_file(char *name, long size,
 	    break;
 	  } else {
 	    // Point to next cluster
-	    int the_cluster=(fat_offset*(512/4)+(offset/4))+1;
+	    uint32_t the_cluster=(fat_offset*(512/4)+(offset/4))+1;
 	    sector_buffer[offset+0]=(the_cluster>>0)&0xff;
 	    sector_buffer[offset+1]=(the_cluster>>8)&0xff;
 	    sector_buffer[offset+2]=(the_cluster>>16)&0xff;
