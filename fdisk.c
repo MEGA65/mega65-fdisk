@@ -641,12 +641,23 @@ int main(int argc,char **argv)
     write_line(" ",0);
     write_line("Type DELETE EVERYTHING to continue:",0);
     recolour_last_line(2);
+    write_line("Or type FIX MBR to re-write MBR",0);
+    recolour_last_line(2);
     len=read_line(line_of_input,80);
     if (len) {
       write_line(line_of_input,0);
       recolour_last_line(7);
     }
-    if (strcmp("DELETE EVERYTHING",line_of_input)) {
+    if (!strcmp("FIX MBR",line_of_input)) {
+      build_mbr(sys_partition_start,
+		sys_partition_sectors,
+		fat_partition_start,
+		fat_partition_sectors);
+      sdcard_writesector(0);
+      show_mbr();
+      write_line("MBR Re-written",0);
+      while(1) continue;
+    } else if (strcmp("DELETE EVERYTHING",line_of_input)) {
       write_line("Entered text does not match. Try again.",0);
       recolour_last_line(8);
     } else
