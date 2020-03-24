@@ -29,6 +29,11 @@ uint32_t sdcard_getsize(void)
 {
   struct stat s;
 
+  if (!sdcard) {
+    fprintf(stderr,"SD card not open.\n");
+    exit(-1);
+  }
+  
   int r=fstat(fileno(sdcard),&s);
 
   if (r) {
@@ -36,12 +41,14 @@ uint32_t sdcard_getsize(void)
     exit(-1);
   }
 
-  return s.st_size/512;
+  fprintf(stderr,"Size = $%08X sectors.\n",(unsigned int) 16000000000LL/512LL);
+  //  return s.st_size/512;
+  return 16000000000LL/512;
 }
 
 void sdcard_open(void)
 {
-  sdcard=fopen("sdcard.img","r+");
+  sdcard=fopen("/dev/sdb","r+");
   if (!sdcard) {
     fprintf(stderr,"Could not open sdcard.img.\n");
     perror("fopen");
