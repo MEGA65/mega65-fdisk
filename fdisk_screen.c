@@ -333,15 +333,8 @@ char read_line(char *buffer,unsigned char maxlen)
       
       //      *(unsigned char *)0x8000 = c;
 
-      // Clear keys from hardware keyboard scanner
-      // XXX we clear all keys here, and work around a bug that causes crazy
-      // fast key repeating. This can be turned back into acknowledging the
-      // single key again later
-      while (*(unsigned char *)0xD610) {
-	unsigned int i;
-	*(unsigned char *)0xd610=1;
-      
-	for(i=0;i<25000;i++) continue;
+      // Clear key from hardware keyboard scanner
+      *(unsigned char *)0xd610=1;      
       }
     }
   }
