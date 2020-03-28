@@ -335,7 +335,6 @@ char read_line(char *buffer,unsigned char maxlen)
 
       // Clear key from hardware keyboard scanner
       *(unsigned char *)0xd610=1;      
-      }
     }
   }
 
