@@ -337,8 +337,6 @@ char read_line(char *buffer,unsigned char maxlen)
       *(unsigned char *)0xd610=1;      
       }
     }
-  }
-
   return len;
 }
 #else
