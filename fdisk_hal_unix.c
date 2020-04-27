@@ -41,7 +41,7 @@ uint32_t sdcard_getsize(void)
     exit(-1);
   }
 
-  fprintf(stderr,"Size = $%08X sectors.\n",(unsigned int) 16000000000LL/512LL);
+  fprintf(stderr,"Size = $%08X sectors.\n",(unsigned int) (16000000000LL/512LL));
   //  return s.st_size/512;
   return 16000000000LL/512;
 }
