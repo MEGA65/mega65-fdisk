@@ -7,6 +7,16 @@
 
 FILE *sdcard=NULL;
 
+unsigned char sdcard_reset(void)
+{
+	return 0;
+}
+
+void sdcard_select(unsigned char n)
+{
+	return;
+}
+
 void sdcard_readsector(const uint32_t sector_number)
 {
   fseek(sdcard,sector_number*512LL,SEEK_SET);

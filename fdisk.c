@@ -532,7 +532,9 @@ void main(void)
   sdcard_select(0);
   if (sdcard_reset()) {
     write_line("No card detected on bus 0",2);
+#ifdef __CC65__
     recolour_last_line(8);    
+#endif
   }  else { 
     sdcard_sectors = sdcard_getsize();
     
@@ -550,7 +552,9 @@ void main(void)
   sdcard_select(1);
   if (sdcard_reset()) {
     write_line("No card detected on bus 1",2);
+#ifdef __CC65__
     recolour_last_line(8);    
+#endif
   } else {
     sdcard_sectors = sdcard_getsize();
     
@@ -564,8 +568,10 @@ void main(void)
   
   // Make user select SD card
   write_line("Please select SD card to modify: 0/1",0);
+#ifdef __CC65__
   recolour_last_line(7);    
   sdcard_select(mega65_getkey());
+#endif
 
   // Then make sure we have correct information for the selected card
   sdcard_open();
