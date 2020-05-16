@@ -36,7 +36,11 @@ all:	$(FILES)
 $(CC65):
 	git submodule init
 	git submodule update
-	(cd cc65 && make -j 8)
+ifeq ($(USE_LOCAL_CC65),"")
+	( cd cc65 && make -j 8 )
+else
+	@echo "Using local installed CC65."
+endif
 
 ascii8x8.bin: ascii00-ff.png pngprepare
 	./pngprepare charrom ascii00-ff.png ascii8x8.bin
@@ -49,7 +53,7 @@ ascii.h:	asciih
 pngprepare:	pngprepare.c
 	$(CC) -I/usr/local/include -L/usr/local/lib -o pngprepare pngprepare.c -lpng
 
-m65fdisk.prg:	$(ASSFILES) $(DATAFILES) $(CL65)
+m65fdisk.prg:	$(ASSFILES) $(DATAFILES) $(CC65)
 	$(CL65) $(COPTS) $(LOPTS) -vm -m m65fdisk.map -o m65fdisk.prg $(ASSFILES)
 
 m65fdisk:	$(HEADERS) Makefile fdisk.c fdisk_fat32.c fdisk_hal_unix.c fdisk_memory.c fdisk_screen.c
