@@ -14,10 +14,22 @@ const uint16_t sd_ctl=0xd680L;
 const uint16_t sd_addr=0xd681L;
 const uint16_t sd_errorcode=0xd6daL;
 
-unsigned char sdhc_card=0;
-
 // Tell utilpacker what our display name is
 const char *prop_m65u_name="PROP.M65U.NAME=SDCARD FDISK+FORMAT UTILITY";
+
+unsigned char key=0;
+unsigned char mega65_getkey(void)
+{
+  while(!PEEK(0xD610)) continue;
+  key=PEEK(0xD610);
+  POKE(0xD610,0);
+  return key;
+}
+
+void sdcard_select(unsigned char n)
+{
+  POKE(0xD680,0xc0+(n&1));
+}
 
 void usleep(uint32_t micros)
 {
@@ -32,7 +44,9 @@ void usleep(uint32_t micros)
   return;
 }
 
-void sdcard_reset(void)
+long reset_timeout;
+
+unsigned char sdcard_reset(void)
 {
   // Reset and release reset
   //  write_line("Resetting SD card...",0);
@@ -43,16 +57,19 @@ void sdcard_reset(void)
   POKE(sd_ctl,0);
   POKE(sd_ctl,1);
 
+  reset_timeout=100000L;
+  
   // Now wait for SD card reset to complete
   while (PEEK(sd_ctl)&3) {
     POKE(0xd020,(PEEK(0xd020)+1)&15);
+    reset_timeout--;
+    if (!reset_timeout) return 0xff;
   }
   
-  if (sdhc_card) {
-    // Set SDHC flag (else writing doesnt work for some reason)
-    write_line("Setting SDHC mode",0);
-    POKE(sd_ctl,0x41);
-  }
+  // Set SDHC flag, since we don't support SDC cards any more
+  POKE(sd_ctl,0x41);
+
+  return 0;
 }
 
 void mega65_fast(void)
@@ -91,60 +108,27 @@ uint32_t sdcard_getsize(void)
   
   // Work out if it is SD or SDHC first of all
   // SD cards can't read at non-sector aligned addresses
-  sdcard_reset();
+  if (sdcard_reset()) return 0;
 
-  // Begin with aligned address, and confirm it works ok.
-  POKE(0xD681U,0); POKE(0xD682U,0); POKE(0xD683U,0); POKE(0xD684U,0);
-  // Trigger read
-  POKE(0xD680U,2);
-
-  // Allow a lot of time for first read after reset to complete
-  // (some cards take a while)
-  for(result=0;result<20;result++) {
-    if (PEEK(sd_ctl&3)==0) break;
-    usleep(65535U);
-  }
-  
-  // Setup non-aligned address
-  POKE(0xD681U,2); POKE(0xD682U,0); POKE(0xD683U,0); POKE(0xD684U,0);
-  // Trigger read
-  POKE(0xD680U,2);
-  // Then sleep for plenty of time for the read to complete
-  for(result=0;result<20;result++) {
-    if (PEEK(sd_ctl&3)==0) break;
-    usleep(65535U);
-  }
-
-  if (!PEEK(sd_ctl)) {
-    write_line("SDHC card detected. Using sector addressing.",0);
-    sdhc_card=1;
-  } else {
-    write_line("SDSC (<4GB) card detected. Using byte addressing.",0);
-    POKE(0xD680U,0x40);
-    sdcard_reset();
-    sdhc_card=0;
-  }
-
-  if (sdhc_card) {
-    // SDHC claims 32GB limit, and reading from beyond that might cause
-    // trouble. However, 32bits x 512byte sectors = 16TiB addressable.
-    // It thus seems that the top byte of the address may not be safe to use,
-    // or at least the top few bits.
-    sector_number=0x02000000U;
-    step=sector_number;
-    write_line("Determining size of SDHC card...",0);
-  } else
-    write_line("Determining size of SD card...",0);
+  // SDHC claims 32GB limit, and reading from beyond that might cause
+  // trouble. However, 32bits x 512byte sectors = 16TiB addressable.
+  // It thus seems that the top byte of the address may not be safe to use,
+  // or at least the top few bits.
+  sector_number=0x02000000U;
+  step=sector_number;
 
   // Work out size of SD card in a safe way
   // (binary search of sector numbers is NOT safe for some reason.
   //  It frequently reports bigger than the size of the card)
   sector_number=0;
-  step=16*2048; // = 16MiB
+  step=256*2048; // = 256MiB
   while(sector_number<0x10000000U) {
+    //    write_line("Trying to read sector $",0);
+    //    screen_hex(screen_line_address-80+24,sector_number);
     sdcard_readsector(sector_number);
     result=PEEK(sd_ctl)&0x63;
     if (result) {
+      //      write_line("Read failed",2);
       // Failed to read this, so reduce step size, and then resume.
 
       // Reset card ready for next try
@@ -153,8 +137,9 @@ uint32_t sdcard_getsize(void)
       sector_number-=step;
       step=step>>2;
       if (!step) break;
-    }
+    } // else write_line("Read succeeded",2);
     sector_number+=step;
+    //    mega65_getkey();
 
     // show card size as we figure it out,
     // and stay on the same line of output
@@ -166,8 +151,8 @@ uint32_t sdcard_getsize(void)
   // Report number of sectors
   write_line("Maximum readable sector is $",0);
   screen_hex(screen_line_address-80+28,sector_number);
-  screen_decimal(screen_line_address,sector_number/1024L);
-  write_line("K Sector SD CARD.",6);  
+  //  screen_decimal(screen_line_address,sector_number/1024L);
+  //  write_line("K Sector SD CARD.",6);  
   
   // Work out size in MB and tell user
   show_card_size(sector_number);
@@ -203,14 +188,7 @@ void sdcard_readsector(const uint32_t sector_number)
 {
   char tries=0;
   
-  uint32_t sector_address=sector_number*512;
-  if (sdhc_card) sector_address=sector_number;
-  else {
-    if (sector_number>=0x7fffff) {
-      write_line("ERROR: Asking for sector @ >= 4GB on SDSC card.",0);
-      while(1) continue;
-    }
-  }
+  uint32_t sector_address=sector_number;
 
   POKE(sd_addr+0,(sector_address>>0)&0xff);
   POKE(sd_addr+1,(sector_address>>8)&0xff);
@@ -289,8 +267,7 @@ void sdcard_writesector(const uint32_t sector_number)
 
   // Set address to read/write
   POKE(sd_ctl,1); // end reset
-  if (!sdhc_card) sector_address=sector_number*512;
-  else sector_address=sector_number;
+  sector_address=sector_number;
   POKE(sd_addr+0,(sector_address>>0)&0xff);
   POKE(sd_addr+1,(sector_address>>8)&0xff);
   POKE(sd_addr+2,(sector_address>>16)&0xff);

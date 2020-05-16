@@ -90,7 +90,7 @@ void write_line(char *s,char col)
 #ifdef __CC65__
   char len=0;
   while(s[len]) len++;
-  lcopy((long)&s[0],screen_line_address+col,len);
+  if (len) lcopy((long)&s[0],screen_line_address+col,len);
   screen_line_address+=80;
   if ((screen_line_address-SCREEN_ADDRESS)>=(24*80)) {
     screen_line_address-=80;
@@ -336,8 +336,6 @@ char read_line(char *buffer,unsigned char maxlen)
       // Clear key from hardware keyboard scanner
       *(unsigned char *)0xd610=1;      
     }
-  }
-
   return len;
 }
 #else

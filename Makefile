@@ -38,8 +38,8 @@ $(CC65):
 	git submodule update
 	(cd cc65 && make -j 8)
 
-ascii8x8.bin: ascii00-7f.png pngprepare
-	./pngprepare charrom ascii00-7f.png ascii8x8.bin
+ascii8x8.bin: ascii00-ff.png pngprepare
+	./pngprepare charrom ascii00-ff.png ascii8x8.bin
 
 asciih:	asciih.c
 	$(CC) -o asciih asciih.c

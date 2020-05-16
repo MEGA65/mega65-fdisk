@@ -121,6 +121,9 @@ void process_file(int mode, char *outputfilename)
   if (png_get_color_type(png_ptr, info_ptr) == PNG_COLOR_TYPE_RGBA)
     multiplier=4;
 
+  if (png_get_color_type(png_ptr, info_ptr) == PNG_COLOR_TYPE_GRAY)
+    multiplier=1;
+
   if (multiplier==-1) {
     fprintf(stderr,"Could not convert file to RGB or RGBA\n");
   }

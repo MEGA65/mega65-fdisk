@@ -193,7 +193,7 @@ void build_dosbootsector(const uint8_t volume_name[11],
 
   // 0x20-0x23 = 32-bit number of data sectors in file system
   for(i=0;i<4;i++) sector_buffer[0x20+i]=((data_sectors)>>(i*8))&0xff;
-
+  
   // 0x24-0x27 = 32-bit number of sectors per fat
   for(i=0;i<4;i++) sector_buffer[0x24+i]=((fs_sectors_per_fat)>>(i*8))&0xff;
 
@@ -290,7 +290,7 @@ uint32_t sectors_required;
 uint32_t fat_available_sectors;
 
 void sector_buffer_write_uint16(const uint16_t offset,
-				 const uint32_t value)
+				const uint32_t value)
 {
   sector_buffer[offset+0]=(value>>0)&0xff;
   sector_buffer[offset+1]=(value>>8)&0xff;
@@ -483,8 +483,8 @@ void show_partition_entry(const char i)
   write_line(report,0);
 #else
   printf("%02X%c : Start=%3d/%2d/%4d or %08X / End=%3d/%2d/%4d or %08X\n",
-	id,active&80?'*':' ',
-	shead,ssector,scylinder,lba_start,ehead,esector,ecylinder,lba_end);
+	 id,active&80?'*':' ',
+	 shead,ssector,scylinder,lba_start,ehead,esector,ecylinder,lba_end);
 #endif
   
 }
@@ -495,7 +495,7 @@ void show_mbr(void)
   
   sdcard_readsector(0);  
   
-  write_line(" ",0);
+  write_line("",0);
 
   if ((sector_buffer[0x1fe]!=0x55)||(sector_buffer[0x1ff]!=0xAA))
     write_line("Current partition table is invalid.",0);
@@ -510,27 +510,73 @@ void show_mbr(void)
 #ifdef __CC65__
 void main(void)
 #else
-int main(int argc,char **argv)
+  int main(int argc,char **argv)
 #endif
 {
 #ifdef __CC65__
   mega65_fast();
   setup_screen();
 #endif  
+
+  sdcard_select(0);
   
   sdcard_open();
 
   // Memory map the SD card sector buffer on MEGA65
   sdcard_map_sector_buffer();
 
-  write_line("Detecting SD card type and size (can take a while)",0);
+  write_line("Detecting SD card(s) (can take a while)",0);
   
-  sdcard_sectors = sdcard_getsize();
+  write_line("SD Card 0 (External microSD slot):",0);
+  
+  sdcard_select(0);
+  if (sdcard_reset()) {
+    write_line("No card detected on bus 0",2);
+#ifdef __CC65__
+    recolour_last_line(8);    
+#endif
+  }  else { 
+    sdcard_sectors = sdcard_getsize();
+    
+    // Report speed of SD card
+    sdcard_readspeed_test();
+    
+    // Show summary of current MBR
+    show_mbr();
+  }
 
-  // Report speed of SD card
-  sdcard_readspeed_test();
+  write_line("",0);
+
+  write_line("SD Card 1 (internal SD slot):",0);
+
+  sdcard_select(1);
+  if (sdcard_reset()) {
+    write_line("No card detected on bus 1",2);
+#ifdef __CC65__
+    recolour_last_line(8);    
+#endif
+  } else {
+    sdcard_sectors = sdcard_getsize();
+    
+    // Report speed of SD card
+    sdcard_readspeed_test();
+    
+    // Show summary of current MBR
+    show_mbr();
+  }
+  write_line("",0);
   
-  // Show summary of current MBR
+  // Make user select SD card
+  write_line("Please select SD card to modify: 0/1",0);
+#ifdef __CC65__
+  recolour_last_line(7);    
+  sdcard_select(mega65_getkey());
+#endif
+
+  // Then make sure we have correct information for the selected card
+  sdcard_open();
+  sdcard_sectors = sdcard_getsize();
+  sdcard_readspeed_test();
   show_mbr();
   
   // Calculate sectors for the system and FAT32 partitions.
@@ -570,7 +616,7 @@ int main(int argc,char **argv)
 	  fat_partition_sectors,fat_available_sectors);
 #else
   // Tell use how many sectors available for partition
-  write_line(" ",0);
+  write_line("",0);
   write_line("$         Sectors available for MEGA65 System partition.",0);
   screen_hex(screen_line_address-79,sys_partition_sectors);
   build_mega65_sys_sector(sys_partition_sectors);
@@ -601,8 +647,8 @@ int main(int argc,char **argv)
   fprintf(stderr,"Creating File System with %u (0x%x) CLUSTERS, %d SECTORS PER FAT, %d RESERVED SECTORS.\r\n",
 	  fs_clusters,fs_clusters,fat_sectors,reserved_sectors);
 #else
-  write_line(" ",0);
-  write_line("Format SD Card with new partition table and FAT32 file system?",0);
+  write_line("",0);
+  write_line("Format Card with new partition table and FAT32 file system?",0);
   recolour_last_line(7);
   {
     char col=6;
@@ -635,26 +681,26 @@ int main(int argc,char **argv)
   //  multisector_write_test();
   
   while(1)
-  {
-    char line_of_input[80];
-    unsigned char len;
-    write_line(" ",0);
-    write_line("Type DELETE EVERYTHING to continue:",0);
-    recolour_last_line(2);
-    write_line("Or type FIX MBR to re-write MBR",0);
-    recolour_last_line(2);
-    len=read_line(line_of_input,80);
-    if (len) {
-      write_line(line_of_input,0);
-      recolour_last_line(7);
-    }
-    if (!strcmp("FIX MBR",line_of_input)) {
-      build_mbr(sys_partition_start,
-		sys_partition_sectors,
-		fat_partition_start,
-		fat_partition_sectors);
-      sdcard_writesector(0);
-      show_mbr();
+    {
+      char line_of_input[80];
+      unsigned char len;
+      write_line("",0);
+      write_line("Type DELETE EVERYTHING to continue:",0);
+      recolour_last_line(2);
+      write_line("Or type FIX MBR to re-write MBR",0);
+      recolour_last_line(2);
+      len=read_line(line_of_input,80);
+      if (len) {
+	write_line(line_of_input,0);
+	recolour_last_line(7);
+      }
+      if (!strcmp("FIX MBR",line_of_input)) {
+	build_mbr(sys_partition_start,
+		  sys_partition_sectors,
+		  fat_partition_start,
+		  fat_partition_sectors);
+	sdcard_writesector(0);
+	show_mbr();
       write_line("MBR Re-written",0);
       while(1) continue;
     } else if (strcmp("DELETE EVERYTHING",line_of_input)) {
@@ -668,7 +714,7 @@ int main(int argc,char **argv)
   
   // MBR is always the first sector of a disk
 #ifdef __CC65__
-  write_line(" ",0);
+  write_line("",0);
   write_line("Writing Partition Table / Master Boot Record...",0);
 #endif
   build_mbr(sys_partition_start,
@@ -769,7 +815,7 @@ int main(int argc,char **argv)
   sdcard_writesector(fat_partition_start+rootdir_sector);
 
 #ifdef __CC65__
-  write_line(" ",0);
+  write_line("",0);
   write_line("Clearing file system data structures...",0);
 #endif
   // Make sure all other sectors are empty
@@ -890,7 +936,7 @@ int main(int argc,char **argv)
   
 #ifdef __CC65__
   POKE(0xd021U,6);
-  write_line(" ",0);
+  write_line("",0);
   write_line("SD Card has been formatted.  Remove, Copy MEGA65.ROM, Reinsert AND Reboot.",0);
   while(1) continue;
 #else

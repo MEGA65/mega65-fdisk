@@ -7,6 +7,16 @@
 
 FILE *sdcard=NULL;
 
+unsigned char sdcard_reset(void)
+{
+	return 0;
+}
+
+void sdcard_select(unsigned char n)
+{
+	return;
+}
+
 void sdcard_readsector(const uint32_t sector_number)
 {
   fseek(sdcard,sector_number*512LL,SEEK_SET);
@@ -41,7 +51,7 @@ uint32_t sdcard_getsize(void)
     exit(-1);
   }
 
-  fprintf(stderr,"Size = $%08X sectors.\n",(unsigned int) 16000000000LL/512LL);
+  fprintf(stderr,"Size = $%08X sectors.\n",(unsigned int) (16000000000LL/512LL));
   //  return s.st_size/512;
   return 16000000000LL/512;
 }
