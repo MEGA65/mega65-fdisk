@@ -1,6 +1,11 @@
 
+ifeq ($(USE_LOCAL_CC65),"")
 CC65=	cc65/bin/cc65
 CL65=	cc65/bin/cl65
+else
+CC65=	cc65
+CL65=	cl65
+endif
 COPTS=	-t c64 -O -Or -Oi -Os --cpu 65c02 -Icc65/include
 LOPTS=	--asm-include-dir cc65/asminc --cfg-path cc65/cfg --lib-path cc65/lib
 
@@ -34,9 +39,9 @@ DATAFILES=	ascii8x8.bin
 all:	$(FILES)
 
 $(CC65):
+ifeq ($(USE_LOCAL_CC65),"")
 	git submodule init
 	git submodule update
-ifeq ($(USE_LOCAL_CC65),"")
 	( cd cc65 && make -j 8 )
 else
 	@echo "Using local installed CC65."
