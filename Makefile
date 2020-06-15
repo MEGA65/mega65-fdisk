@@ -1,11 +1,14 @@
 
-ifeq ($(USE_LOCAL_CC65),"")
-CC65=	cc65/bin/cc65
-CL65=	cc65/bin/cl65
+ifdef USE_LOCAL_CC65
+	# use locally installed binary (requires cc65 to be in the $PATH)
+	CC65=cc65
+	CL65=cl65
 else
-CC65=	cc65
-CL65=	cl65
+	# use the binary built from the submodule
+	CC65=cc65/bin/cc65
+	CL65=cc65/bin/cl65
 endif
+
 COPTS=	-t c64 -O -Or -Oi -Os --cpu 65c02 -Icc65/include
 LOPTS=	--asm-include-dir cc65/asminc --cfg-path cc65/cfg --lib-path cc65/lib
 
@@ -39,14 +42,15 @@ DATAFILES=	ascii8x8.bin
 
 all:	$(FILES)
 
+$(CL65):
 $(CC65):
 	$(warning ======== Making: $@)
-ifeq ($(USE_LOCAL_CC65),"")
+ifdef $(USE_LOCAL_CC65)
+	@echo "Using local installed CC65."
+else
 	git submodule init
 	git submodule update
-	( cd cc65 && make -j 8 )
-else
-	@echo "Using local installed CC65."
+	(cd cc65 && make -j 8 )
 endif
 
 ascii8x8.bin: ascii00-ff.png pngprepare
