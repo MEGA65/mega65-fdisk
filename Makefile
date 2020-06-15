@@ -73,7 +73,12 @@ m65fdisk:	$(HEADERS) Makefile fdisk.c fdisk_fat32.c fdisk_hal_unix.c fdisk_memor
 	gcc -Wall -Wno-char-subscripts -o m65fdisk fdisk.c fdisk_fat32.c fdisk_hal_unix.c fdisk_memory.c fdisk_screen.c
 
 clean:
-	rm -f $(FILES)
+	rm -f $(FILES) m65fdisk.map \
+	pngprepare \
+	*.o \
+	fdisk*.s \
+	ascii.h asciih \
+	ascii8x8.bin
 
 cleangen:
 	rm ascii8x8.bin
