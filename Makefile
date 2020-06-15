@@ -34,11 +34,13 @@ HEADERS=	Makefile \
 DATAFILES=	ascii8x8.bin
 
 %.s:	%.c $(HEADERS) $(DATAFILES) $(CC65)
+	$(warning ======== Making: $@)
 	$(CC65) $(COPTS) -o $@ $<
 
 all:	$(FILES)
 
 $(CC65):
+	$(warning ======== Making: $@)
 ifeq ($(USE_LOCAL_CC65),"")
 	git submodule init
 	git submodule update
@@ -48,20 +50,26 @@ else
 endif
 
 ascii8x8.bin: ascii00-ff.png pngprepare
+	$(warning ======== Making: $@)
 	./pngprepare charrom ascii00-ff.png ascii8x8.bin
 
 asciih:	asciih.c
+	$(warning ======== Making: $@)
 	$(CC) -o asciih asciih.c
 ascii.h:	asciih
+	$(warning ======== Making: $@)
 	./asciih
 
 pngprepare:	pngprepare.c
+	$(warning ======== Making: $@)
 	$(CC) -I/usr/local/include -L/usr/local/lib -o pngprepare pngprepare.c -lpng
 
 m65fdisk.prg:	$(ASSFILES) $(DATAFILES) $(CC65)
+	$(warning ======== Making: $@)
 	$(CL65) $(COPTS) $(LOPTS) -vm -m m65fdisk.map -o m65fdisk.prg $(ASSFILES)
 
 m65fdisk:	$(HEADERS) Makefile fdisk.c fdisk_fat32.c fdisk_hal_unix.c fdisk_memory.c fdisk_screen.c
+	$(warning ======== Making: $@)
 	gcc -Wall -Wno-char-subscripts -o m65fdisk fdisk.c fdisk_fat32.c fdisk_hal_unix.c fdisk_memory.c fdisk_screen.c
 
 clean:
