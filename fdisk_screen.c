@@ -17,7 +17,7 @@ char screen_column=0;
 
 #ifdef __CC65__
 unsigned char *footer_messages[FOOTER_MAX+1]={
-  "MEGA65 FDISK+FORMAT V00.08 : (C) COPYRIGHT 2017-2019 PAUL GARDNER-STEPHEN ETC.  ",
+  "MEGA65 FDISK+FORMAT V00.09 : (C) COPYRIGHT 2017-2020 PAUL GARDNER-STEPHEN ETC.  ",
   "                                                                                ",
   "A FATAL ERROR HAS OCCURRED, SORRY.                                              "
 };
