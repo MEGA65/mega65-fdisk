@@ -527,7 +527,7 @@ void main(void)
 
   write_line("Detecting SD card(s) (can take a while)",0);
   
-  write_line("SD Card 1 (External microSD slot):",0);
+  write_line("SD Card 0 (Internal SD slot):",0);
   
   sdcard_select(0);
   if (sdcard_reset()) {
@@ -547,7 +547,7 @@ void main(void)
 
   write_line("",0);
 
-  write_line("SD Card 0 (internal SD slot):",0);
+  write_line("SD Card 1 (External microSD slot):",0);
 
   sdcard_select(1);
   if (sdcard_reset()) {
