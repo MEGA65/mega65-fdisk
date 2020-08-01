@@ -28,7 +28,7 @@ unsigned char mega65_getkey(void)
 
 void sdcard_select(unsigned char n)
 {
-  POKE(0xD680,0xc0+(n&1));
+  POKE(sd_ctl,0xc0+(n&1));
 }
 
 void usleep(uint32_t micros)
@@ -309,6 +309,10 @@ void sdcard_writesector(const uint32_t sector_number)
 	  POKE(sd_ctl,0); // begin reset
 	  usleep(500000);
 	  POKE(sd_ctl,1); // end reset
+	  if (sector_number)
+	    POKE(sd_ctl,0x57); // open SD card write gate
+	  else
+	    POKE(sd_ctl,0x4D); // open SD card write gate for MBR
 	  POKE(sd_ctl,3); // retry write
 
 	}
@@ -317,6 +321,10 @@ void sdcard_writesector(const uint32_t sector_number)
       }
 
     // Command write
+    if (sector_number)
+      POKE(sd_ctl,0x57); // open SD card write gate
+    else
+      POKE(sd_ctl,0x4D); // open SD card write gate for MBR
     POKE(sd_ctl,3);
 
     while (!(PEEK(sd_ctl)&3)) continue;
@@ -332,6 +340,10 @@ void sdcard_writesector(const uint32_t sector_number)
 	  POKE(sd_ctl,0); // begin reset
 	  usleep(500000);
 	  POKE(sd_ctl,1); // end reset
+          if (sector_number)
+            POKE(sd_ctl,0x57); // open SD card write gate
+          else
+            POKE(sd_ctl,0x4D); // open SD card write gate for MBR
 	  POKE(sd_ctl,3); // retry write
 
 	}
@@ -489,6 +501,10 @@ void multisector_write_test(void)
     // Wait for SD card to go ready
     while (PEEK(sd_ctl)&3) continue;
     
+    if (sector_number)
+      POKE(sd_ctl,0x57); // open SD card write gate
+    else
+      POKE(sd_ctl,0x4D); // open SD card write gate for MBR
     if (n==first_sector) {
       // First sector of multi-sector write
       POKE(sd_ctl,0x04);
@@ -505,6 +521,10 @@ void multisector_write_test(void)
   }
 
   // End multi-sector write
+  if (sector_number)
+    POKE(sd_ctl,0x57); // open SD card write gate
+  else
+    POKE(sd_ctl,0x4D); // open SD card write gate for MBR
   POKE(sd_ctl,0x06);
 
   // Wait for SD card to go busy
@@ -552,6 +572,10 @@ void multisector_write_test(void)
     lcopy((long)sector_buffer,sd_sectorbuffer,512);
     POKE(SCREEN_ADDRESS+10*80+n-first_sector,lpeek(sd_sectorbuffer));
     
+    if (sector_number)
+      POKE(sd_ctl,0x57); // open SD card write gate
+    else
+      POKE(sd_ctl,0x4D); // open SD card write gate for MBR
     if (n==first_sector) {
       // First sector of multi-sector write
       POKE(sd_ctl,0x04);
@@ -568,6 +592,10 @@ void multisector_write_test(void)
   }
 
   // End multi-sector write
+  if (sector_number)
+    POKE(sd_ctl,0x57); // open SD card write gate
+  else
+    POKE(sd_ctl,0x4D); // open SD card write gate for MBR
   POKE(sd_ctl,0x06);
 
   // Wait for SD card to go busy
@@ -626,6 +654,10 @@ void sdcard_erase(const uint32_t first_sector,const uint32_t last_sector)
     // Wait for SD card to go ready
     while (PEEK(sd_ctl)&3) continue;
 
+    if (n)
+      POKE(sd_ctl,0x57); // open SD card write gate
+    else
+      POKE(sd_ctl,0x4D); // open SD card write gate for MBR
     if (n==first_sector) {
       // First sector of multi-sector write
       POKE(sd_ctl,0x04);
@@ -650,6 +682,7 @@ void sdcard_erase(const uint32_t first_sector,const uint32_t last_sector)
 
 #ifndef NOFAST_ERASE
   // Then say when we are done
+  POKE(sd_ctl,0x57); // open SD card write gate
   POKE(sd_ctl,0x06);
   
   // Wait for SD card to go busy
