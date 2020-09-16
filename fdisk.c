@@ -34,6 +34,9 @@
 #include "fdisk_fat32.h"
 #include "ascii.h"
 
+// When set, it enters batch mode
+unsigned char dont_confirm=0;
+
 uint8_t sector_buffer[512];
 
 void clear_sector_buffer(void)
@@ -518,6 +521,8 @@ void main(void)
   setup_screen();
 #endif  
 
+ next_card:
+  
   sdcard_select(0);
   
   sdcard_open();
@@ -684,16 +689,19 @@ void main(void)
     {
       char line_of_input[80];
       unsigned char len;
-      write_line("",0);
-      write_line("Type DELETE EVERYTHING to continue:",0);
-      recolour_last_line(2);
-      write_line("Or type FIX MBR to re-write MBR",0);
-      recolour_last_line(2);
-      len=read_line(line_of_input,80);
-      if (len) {
-	write_line(line_of_input,0);
-	recolour_last_line(7);
+      if (!dont_confirm) {
+	write_line("",0);
+	write_line("Type DELETE EVERYTHING to continue:",0);
+	recolour_last_line(2);
+	write_line("Or type FIX MBR to re-write MBR",0);
+	recolour_last_line(2);
+	len=read_line(line_of_input,80);
+	if (len) {
+	  write_line(line_of_input,0);
+	  recolour_last_line(7);
+	}
       }
+      
       if (!strcmp("FIX MBR",line_of_input)) {
 	build_mbr(sys_partition_start,
 		  sys_partition_sectors,
@@ -703,9 +711,14 @@ void main(void)
 	show_mbr();
       write_line("MBR Re-written",0);
       while(1) continue;
-    } else if (strcmp("DELETE EVERYTHING",line_of_input)) {
+    } else if (strcmp("DELETE EVERYTHING",line_of_input)
+	       &&strcmp("BATCH MODE",line_of_input)) {
       write_line("Entered text does not match. Try again.",0);
       recolour_last_line(8);
+    } if (!strcmp("FOLTERLOS MODUS BITTE",line_of_input)) {
+	// Delete cards REPEATEDLY
+	dont_confirm=1;
+	break;
     } else
       // String matches -- so proceed
       break;
@@ -934,11 +947,23 @@ void main(void)
 #endif
   
   
-#ifdef __CC65__
+#ifdef __CC65__  
+  
   POKE(0xd021U,6);
   write_line("",0);
   write_line("SD Card has been formatted.  Remove, Copy MEGA65.ROM, Reinsert AND Reboot.",0);
-  while(1) continue;
+
+  if (!dont_confirm) {
+    while(1) continue;
+  } else {
+
+    write_line("Press ALMOST ANY KEY to format next card",0);
+    while(!PEEK(0xD610)) continue;
+    POKE(0xD610,0);
+
+    goto next_card;
+  }
+  
 #else
   return 0;
 #endif
