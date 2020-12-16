@@ -715,7 +715,7 @@ void main(void)
 	       &&strcmp("BATCH MODE",line_of_input)) {
       write_line("Entered text does not match. Try again.",0);
       recolour_last_line(8);
-    } if (!strcmp("FOLTERLOS MODUS BITTE",line_of_input)) {
+    } else if (!strcmp("FOLTERLOS MODUS BITTE",line_of_input)) {
 	// Delete cards REPEATEDLY
 	dont_confirm=1;
 	break;
