@@ -192,7 +192,7 @@ void build_dosbootsector(const uint8_t volume_name[11],
   clear_sector_buffer();
   
   // Start with template, and then modify relevant fields */
-  for(i=0;i<sizeof(boot_bytes);i++) sector_buffer[i]=boot_bytes[i];
+  lcopy(boot_bytes,sector_buffer,sizeof(boot_bytes));
 
   // 0x20-0x23 = 32-bit number of data sectors in file system
   for(i=0;i<4;i++) sector_buffer[0x20+i]=((data_sectors)>>(i*8))&0xff;
