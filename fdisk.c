@@ -70,14 +70,14 @@ void build_mbr(const uint32_t sys_partition_start,
   // the microSD card, as otherwise the N4/N4DDR boards don't find the FAT partition
   
   // MEGA65 System Partition entry
-  sector_buffer[0x1ce]=0x00;  // Not bootable by DOS
-  sector_buffer[0x1cf]=0x00;  // 3 bytes CHS starting point
-  sector_buffer[0x1d0]=0x00;
-  sector_buffer[0x1d1]=0x00;
+  //  sector_buffer[0x1ce]=0x00;  // Not bootable by DOS
+  //  sector_buffer[0x1cf]=0x00;  // 3 bytes CHS starting point
+  //  sector_buffer[0x1d0]=0x00;
+  //  sector_buffer[0x1d1]=0x00;
   sector_buffer[0x1d2]=0x41;  // Partition type (MEGA65 System Partition)
-  sector_buffer[0x1d3]=0x00;  // 3 bytes CHS end point - SHOULD CHANGE WITH DISK SIZE
-  sector_buffer[0x1d4]=0x00;
-  sector_buffer[0x1d5]=0x00;
+  //  sector_buffer[0x1d3]=0x00;  // 3 bytes CHS end point - SHOULD CHANGE WITH DISK SIZE
+  //  sector_buffer[0x1d4]=0x00;
+  //  sector_buffer[0x1d5]=0x00;
   // LBA starting sector of partition (usually @ 0x0800 = sector 2,048 = 1MB)
   sector_buffer[0x1d6]=(sys_partition_start>>0)&0xff;  
   sector_buffer[0x1d7]=(sys_partition_start>>8)&0xff;  
@@ -91,14 +91,14 @@ void build_mbr(const uint32_t sys_partition_start,
   
   
   // FAT32 Partition entry
-  sector_buffer[0x1be]=0x00;  // Not bootable by DOS
-  sector_buffer[0x1bf]=0x00;  // 3 bytes CHS starting point
-  sector_buffer[0x1c0]=0x00;
-  sector_buffer[0x1c1]=0x00;
+  //  sector_buffer[0x1be]=0x00;  // Not bootable by DOS
+  //  sector_buffer[0x1bf]=0x00;  // 3 bytes CHS starting point
+  //  sector_buffer[0x1c0]=0x00;
+  //  sector_buffer[0x1c1]=0x00;
   sector_buffer[0x1c2]=0x0c;  // Partition type (VFAT32)
-  sector_buffer[0x1c3]=0x00;  // 3 bytes CHS end point - SHOULD CHANGE WITH DISK SIZE
-  sector_buffer[0x1c4]=0x00;
-  sector_buffer[0x1c5]=0x00;
+  //  sector_buffer[0x1c3]=0x00;  // 3 bytes CHS end point - SHOULD CHANGE WITH DISK SIZE
+  //  sector_buffer[0x1c4]=0x00;
+  //  sector_buffer[0x1c5]=0x00;
   // LBA starting sector of FAT32 partition
   sector_buffer[0x1c6]=(fat_partition_start>>0)&0xff;  
   sector_buffer[0x1c7]=(fat_partition_start>>8)&0xff;  
