@@ -413,7 +413,7 @@ void sdcard_writesector(const uint32_t sector_number)
   
 }
 
-uint16_t i;
+static uint16_t i;
 
 void sdcard_readspeed_test(void)
 {
