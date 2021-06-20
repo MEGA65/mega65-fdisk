@@ -240,7 +240,7 @@ void screen_colour_line(unsigned char line,unsigned char colour)
 }
 #endif
 
-unsigned char i;
+static unsigned char i;
 
 #ifdef __CC65__
 void fatal_error(unsigned char *filename, unsigned int line_number)
