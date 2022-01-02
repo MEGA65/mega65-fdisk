@@ -4,7 +4,7 @@
 #include "fdisk_hal.h"
 #include "fdisk_memory.h"
 #include "fdisk_screen.h"
-#include "ascii.h"
+#include "ascii.h"  
 
 #define POKE(X,Y) (*(unsigned char*)(X))=Y
 #define PEEK(X) (*(unsigned char*)(X))
@@ -214,7 +214,7 @@ void do_read_sector(unsigned char cmd,uint32_t sector_number)
       }
 
     // Command read
-    POKE(sd_ctl,2);
+    POKE(sd_ctl,cmd);
     
     // Wait for read to complete
     timeout=50000U;
@@ -258,7 +258,7 @@ void sdcard_readsector(const uint32_t sector_number)
 
 void flash_readsector(const uint32_t sector_number)
 {
-  do_read_sector(0x52,sector_number);
+  do_read_sector(0x53,sector_number);
 }
 
 

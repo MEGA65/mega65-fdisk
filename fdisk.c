@@ -34,6 +34,7 @@
 #include "fdisk_fat32.h"
 #include "ascii.h"
 
+unsigned char slot_magic[16]={0x4d,0x45,0x47,0x41,0x36,0x35,0x42,0x49,0x54,0x53,0x54,0x52,0x45,0x41,0x4d,0x30};
 void flash_readsector(const uint32_t sector_number);
 
 
@@ -513,6 +514,68 @@ void show_mbr(void)
   }
 }
 
+unsigned char i,j,k,file_count;
+unsigned long file_offset,next_offset,file_len,first_sector;
+char eightthree[8+3+1];
+
+void populate_file_system(void)
+{
+  
+  /* Check if flash slot 0 contains embedded files that we should write to the SD card.
+   */
+  flash_readsector(0);
+  lcopy(0xffd6e00,(unsigned long)sector_buffer,512);
+  for(i=0;i<16;i++) {
+    if (slot_magic[i]!=sector_buffer[i]) {      
+      write_line("Cannot find valid core in flash slot 0. Will not populate files.",0);
+      break;
+    }
+  }
+  if (i==16) write_line("Found core in slot 0",0);
+  file_offset=*(unsigned long *)&sector_buffer[0x73];
+  file_count=sector_buffer[0x72];
+  write_line("$         Files in Core, starting at $        .",0);
+  screen_hex(screen_line_address-79,file_count);
+  screen_hex(screen_line_address-42,file_offset);
+
+  for(i=0;i<file_count;i++) {
+    flash_readsector(file_offset);
+    next_offset=*(unsigned long *)&sector_buffer[0];
+    file_len=*(unsigned long *)&sector_buffer[4];
+    write_line("File = '                                ', next_ofs=$         , len=$         ",0);
+    for(j=0;sector_buffer[8+j];j++) lpoke(screen_line_address-72+j,sector_buffer[8+j]);
+    screen_hex(screen_line_address-28,next_offset);
+    screen_hex(screen_line_address-11,file_len);
+
+    // Prepare "EIGHT  THR" formatted DOS filename for fat32_create_contiguous_file
+    for(j=0;j<11;j++) eightthree[j]=' '; eightthree[11]=0;
+    for(j=0;sector_buffer[8+j];j++) {
+      if (sector_buffer[8+j]=='.') k=8;
+      else eightthree[k++]=sector_buffer[8+j];
+      if (k>=11) break;
+    }
+    
+    first_sector=fat32_create_contiguous_file(eightthree,file_len,
+					      fat_partition_start+rootdir_sector,
+					      fat_partition_start+fat1_sector,
+					      fat_partition_start+fat2_sector);
+    if (first_sector) {
+      // Write out file sectors
+      unsigned long addr;
+      for(addr=0;addr<=file_len;addr+=512)
+	{
+	  flash_readsector(file_offset+addr);
+	  sdcard_writesector(first_sector++);
+	}
+    } else write_line("!! Error writing file",0);
+    
+    
+    file_offset=next_offset;
+  }
+  
+  return;  
+}
+
 #ifdef __CC65__
 void main(void)
 #else
@@ -846,55 +909,7 @@ void main(void)
 #ifdef __CC65__
     /* Check if flash slot 0 contains embedded files that we should write to the SD card.
      */
-    flash_readsector(0);
-    
-    
-    {
-      unsigned long first_sector;
-      write_line("Writing current loaded ROM to FAT32 file system",0);
-      
-      // Check if kickstart has patched $FFD2 (which it does for utility menu jobs,
-      // when it thinks there is no ROM loaded, which currently is always).
-      if (lpeek(0x2ffd2L)==0x60) lpoke(0x2ffd2L,0x6c);
-      
-      first_sector=fat32_create_contiguous_file("MEGA65  ROM",0x20000L,
-						fat_partition_start+rootdir_sector,
-						fat_partition_start+fat1_sector,
-						fat_partition_start+fat2_sector);
-      if (first_sector) {
-	// Write out ROM sectors
-	unsigned long addr;
-	for(addr=0x20000;addr<=0x40000L;addr+=512)
-	  {
-	    lcopy(addr,(unsigned long)sector_buffer,512);
-	    sdcard_writesector(first_sector+(addr-0x20000L)/512);
-	  }
-	write_line("Completed writing ROM",0);
-      }
-    }
-    
-  // Look for freezer pre-installed in RAM, and write it out if present.
-   if ((lpeek(0x12000)==0x01)&&(lpeek(0x12001L)==0x01))
-    {
-      unsigned long first_sector;
-      write_line("Writing FREEZER.M65 to FAT32 file system",0);
-
-      first_sector=fat32_create_contiguous_file("FREEZERM65",0x0E000L,
-                                                fat_partition_start+rootdir_sector,
-                                                fat_partition_start+fat1_sector,
-                                                fat_partition_start+fat2_sector);
-      if (first_sector) {
-        // Write out sectors
-        unsigned long addr;
-        for(addr=0x12000L;addr<=0x20000L;addr+=512)
-          {
-            lcopy(addr,sector_buffer,512);
-            sdcard_writesector(first_sector+(addr-0x12000)/512);
-          }
-        write_line("Completed writing FREEZER.M65",0);
-      }
-    }   
-
+    populate_file_system();
 #else
 
   // Process loading and reading of files from disk image
