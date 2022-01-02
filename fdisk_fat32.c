@@ -23,7 +23,7 @@ void sdcard_readsector(const uint32_t sector_number);
 void mega65_serial_monitor_write(char *s)
 {
   fprintf(stderr,"SERIALOUT: %s\n",s);
-#ifdef CC65
+#ifdef __CC65__
   while(*s) {
     // There is almost certainly a better way to do this, but it works.
     POKE(0x380,*s);
@@ -211,9 +211,9 @@ unsigned long fat32_allocate_cluster(unsigned long cluster)
 */
 long fat32_create_contiguous_file(char* name, long size, long root_dir_sector, long fat1_sector, long fat2_sector)
 {
-  unsigned char i,sn,len;
-  unsigned short offset,j;
-  unsigned short clusters;
+  unsigned char i=0,sn=0,len=0;
+  unsigned short offset=0,j=0;
+  unsigned short clusters=0;
   unsigned long k,start_cluster = 0;
   unsigned long dir_cluster = 2;
   unsigned long last_dir_cluster = 2;

@@ -542,18 +542,19 @@ void populate_file_system(void)
     flash_readsector(file_offset);
     next_offset=*(unsigned long *)&sector_buffer[0];
     file_len=*(unsigned long *)&sector_buffer[4];
-    write_line("File = '                                ', next_ofs=$         , len=$         ",0);
-    for(j=0;sector_buffer[8+j];j++) lpoke(screen_line_address-72+j,sector_buffer[8+j]);
-    screen_hex(screen_line_address-28,next_offset);
-    screen_hex(screen_line_address-11,file_len);
+    write_line("Pre-populating file ",0);
+    for(j=0;sector_buffer[8+j];j++) lpoke(screen_line_address-60+j,sector_buffer[8+j]);
 
     // Prepare "EIGHT  THR" formatted DOS filename for fat32_create_contiguous_file
-    for(j=0;j<11;j++) eightthree[j]=' '; eightthree[11]=0;
+    for(j=0;j<11;j++) eightthree[j]=' '; eightthree[11]=0; k=0;
     for(j=0;sector_buffer[8+j];j++) {
       if (sector_buffer[8+j]=='.') k=8;
       else eightthree[k++]=sector_buffer[8+j];
       if (k>=11) break;
     }
+
+    // Skip header
+    file_offset+=4+4+32;
     
     first_sector=fat32_create_contiguous_file(eightthree,file_len,
 					      fat_partition_start+rootdir_sector,
@@ -564,6 +565,7 @@ void populate_file_system(void)
       unsigned long addr;
       for(addr=0;addr<=file_len;addr+=512)
 	{
+	  POKE(0xD020,PEEK(0xD020)+1);
 	  flash_readsector(file_offset+addr);
 	  sdcard_writesector(first_sector++);
 	}
