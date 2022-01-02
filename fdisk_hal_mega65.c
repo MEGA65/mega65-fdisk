@@ -184,10 +184,9 @@ void sdcard_unmap_sector_buffer(void)
 
 unsigned short timeout;
 
-void sdcard_readsector(const uint32_t sector_number)
+void do_read_sector(unsigned char cmd,uint32_t sector_number)
 {
-  char tries=0;
-  
+  char tries=0;  
   uint32_t sector_address=sector_number;
 
   POKE(sd_addr+0,(sector_address>>0)&0xff);
@@ -250,6 +249,19 @@ void sdcard_readsector(const uint32_t sector_number)
   }
   
 }
+
+void sdcard_readsector(const uint32_t sector_number)
+{
+
+  do_read_sector(0x02,sector_number);
+}
+
+void flash_readsector(const uint32_t sector_number)
+{
+  do_read_sector(0x52,sector_number);
+}
+
+
 
 uint8_t verify_buffer[512];
 

@@ -34,6 +34,9 @@
 #include "fdisk_fat32.h"
 #include "ascii.h"
 
+void flash_readsector(const uint32_t sector_number);
+
+
 // When set, it enters batch mode
 unsigned char dont_confirm=0;
 
@@ -842,7 +845,10 @@ void main(void)
 
 #ifdef __CC65__
     /* Check if flash slot 0 contains embedded files that we should write to the SD card.
-     */       
+     */
+    flash_readsector(0);
+    
+    
     {
       unsigned long first_sector;
       write_line("Writing current loaded ROM to FAT32 file system",0);
