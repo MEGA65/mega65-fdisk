@@ -192,7 +192,7 @@ void build_dosbootsector(const uint8_t volume_name[11],
   clear_sector_buffer();
   
   // Start with template, and then modify relevant fields */
-  lcopy(boot_bytes,sector_buffer,sizeof(boot_bytes));
+  lcopy((unsigned long)boot_bytes,(unsigned long)sector_buffer,sizeof(boot_bytes));
 
   // 0x20-0x23 = 32-bit number of data sectors in file system
   for(i=0;i<4;i++) sector_buffer[0x20+i]=((data_sectors)>>(i*8))&0xff;
@@ -436,7 +436,7 @@ void build_mega65_sys_config_sector(void)
   sector_buffer[0x00B]=0x41;
   // Set name of default disk image
 #ifdef __CC65__
-  lcopy("mega65.d81",&sector_buffer[0x10],10);
+  lcopy((unsigned long)"mega65.d81",(unsigned long)&sector_buffer[0x10],10);
 #else
   bcopy("mega65.d81",&sector_buffer[0x10],10);
 #endif
@@ -519,9 +519,9 @@ void main(void)
 #ifdef __CC65__
   mega65_fast();
   setup_screen();
-#endif  
 
  next_card:
+#endif  
   
   sdcard_select(0);
   
@@ -841,14 +841,12 @@ void main(void)
 #endif
 
 #ifdef __CC65__
-  // Write current rom to MEGA65.ROM on the FAT32 file system
-  // (This is as a convenience during development, where I end up formatting the SD card a lot, and it is a pain
-  // to have to remove the SD card to put the ROM back on each time)
-  if ((lpeek(0x2A004L)=='C')&&(lpeek(0x2A005L)=='B')&&(lpeek(0x2A006L)=='M'))
+    /* Check if flash slot 0 contains embedded files that we should write to the SD card.
+     */       
     {
       unsigned long first_sector;
       write_line("Writing current loaded ROM to FAT32 file system",0);
-
+      
       // Check if kickstart has patched $FFD2 (which it does for utility menu jobs,
       // when it thinks there is no ROM loaded, which currently is always).
       if (lpeek(0x2ffd2L)==0x60) lpoke(0x2ffd2L,0x6c);
@@ -862,18 +860,13 @@ void main(void)
 	unsigned long addr;
 	for(addr=0x20000;addr<=0x40000L;addr+=512)
 	  {
-	    lcopy(addr,sector_buffer,512);
+	    lcopy(addr,(unsigned long)sector_buffer,512);
 	    sdcard_writesector(first_sector+(addr-0x20000L)/512);
 	  }
 	write_line("Completed writing ROM",0);
       }
-    } else {
-    write_line("No ROM currently loaded (SIG=$$$$$$$).",0);
-    screen_hex_byte(screen_line_address-80+30,lpeek(0x2a004));
-    screen_hex_byte(screen_line_address-80+32,lpeek(0x2a005));
-    screen_hex_byte(screen_line_address-80+34,lpeek(0x2a006));
-  }
-
+    }
+    
   // Look for freezer pre-installed in RAM, and write it out if present.
    if ((lpeek(0x12000)==0x01)&&(lpeek(0x12001L)==0x01))
     {
@@ -911,7 +904,7 @@ void main(void)
       exit(-1);
     }
     
-    char dosname[12];
+    char dosname[4096];
     char name[1024],extension[1024];
     bzero(name,sizeof(name));
     bzero(extension,sizeof(extension));
@@ -923,7 +916,8 @@ void main(void)
       fprintf(stderr,"filename or extension too long. Must fit in 8.3 DOS filename. Got '%s'.'%s'\n",name,extension);
       exit(-1);
     }
-    snprintf(dosname,12,"%-8s%-3s",name,extension);
+    snprintf(dosname,4096,"%-8s%-3s",name,extension);
+
     // make dos name upper case
     for(int i=0;i<12;i++) if (dosname[i]>='a'&&dosname[i]<='z') dosname[i]-=0x20;
     
