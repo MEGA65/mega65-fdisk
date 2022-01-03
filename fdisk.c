@@ -528,10 +528,10 @@ void populate_file_system(void)
   for(i=0;i<16;i++) {
     if (slot_magic[i]!=sector_buffer[i]) {      
       write_line("Cannot find valid core in flash slot 0. Will not populate files.",0);
-      break;
+      return;
     }
   }
-  if (i==16) write_line("Found core in slot 0",0);
+  write_line("Found core in slot 0",0);
   file_offset=*(unsigned long *)&sector_buffer[0x73];
   file_count=sector_buffer[0x72];
   write_line("$         Files in Core, starting at $        .",0);
