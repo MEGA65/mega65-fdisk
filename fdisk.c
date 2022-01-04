@@ -584,6 +584,8 @@ void main(void)
   int main(int argc,char **argv)
 #endif
 {
+  unsigned char c;
+  
 #ifdef __CC65__
   mega65_fast();
   setup_screen();
@@ -642,8 +644,12 @@ void main(void)
   // Make user select SD card
   write_line("Please select SD card to modify: 0/1",0);
 #ifdef __CC65__
-  recolour_last_line(7);    
-  sdcard_select(mega65_getkey());
+  recolour_last_line(7);
+  c=0;
+  while (c<0x30||c>0x31) {
+    c=mega65_getkey();
+  }
+  sdcard_select(c);
 #endif
 
   // Then make sure we have correct information for the selected card
