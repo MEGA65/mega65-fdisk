@@ -540,12 +540,15 @@ void populate_file_system(void)
   screen_hex(screen_line_address-41,file_offset);
 
   for(i=0;i<file_count;i++) {
+
     flash_readsector(file_offset);
     next_offset=*(unsigned long *)&sector_buffer[0];
     file_len=*(unsigned long *)&sector_buffer[4];
     write_line("Pre-populating file ",1);
     for(j=0;sector_buffer[8+j];j++) lpoke(screen_line_address-59+j,sector_buffer[8+j]);
-
+#ifdef __CC65__
+    recolour_last_line(8);
+#endif
     // Prepare "EIGHT  THR" formatted DOS filename for fat32_create_contiguous_file
     for(j=0;j<11;j++) eightthree[j]=' '; eightthree[11]=0; k=0;
     for(j=0;sector_buffer[8+j];j++) {
@@ -558,11 +561,13 @@ void populate_file_system(void)
 
     // Skip header
     file_offset+=4+4+32;
+
     
     first_sector=fat32_create_contiguous_file(eightthree,file_len,
 					      fat_partition_start+rootdir_sector,
 					      fat_partition_start+fat1_sector,
 					      fat_partition_start+fat2_sector);
+    
     if (first_sector) {
       // Write out file sectors
       unsigned long addr;
@@ -572,6 +577,9 @@ void populate_file_system(void)
 	  flash_readsector(file_offset+addr);
 	  sdcard_writesector(first_sector++);
 	}
+#ifdef __CC65__
+      recolour_last_line(1);
+#endif      
     } else {
       write_line("!! Error writing file",1);
 #ifdef __CC65__
@@ -789,7 +797,7 @@ void main(void)
 	len=read_line(line_of_input,79);
 	screen_line_address--;
 	if (len) {
-	  write_line(line_of_input,0);
+	  write_line(line_of_input,1);
 	  recolour_last_line(7);
 	}
       }

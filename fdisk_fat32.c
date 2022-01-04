@@ -62,7 +62,7 @@ void serial_hex(unsigned long v)
   shbuf[8]=0x0d;
   shbuf[9]=0x0a;
   shbuf[10]=0;
-  mega65_serial_monitor_write(shbuf);
+  //  mega65_serial_monitor_write(shbuf);
 }
 
 
@@ -192,6 +192,7 @@ unsigned long fat32_allocate_cluster(unsigned long cluster)
       return r;
     }
   }
+
   return 0;
 }
 
@@ -231,13 +232,17 @@ long fat32_create_contiguous_file(char* name, long size, long root_dir_sector, l
   
   clusters = size / (512 * sectors_per_cluster);
   if (size%(512*sectors_per_cluster)) clusters++;
-  
+
   // Look for a free directory slot.
   // Also complain if the file already exists
-  mega65_serial_monitor_write("Search for free directory slot\n");
+  //  mega65_serial_monitor_write("Search for free directory slot\n");
+
   while(dir_cluster>=2&&dir_cluster<0xf0000000) {
     for (sn=0;sn<sectors_per_cluster;sn++) {
+
+      
       sdcard_readsector(root_dir_sector+((dir_cluster-2)*sectors_per_cluster)+sn);
+
       for (offset = 0; offset < 512; offset += 32) {
 	for (i = 0; i < 8; i++)
 	  message[i] = sector_buffer[offset + i];
@@ -250,15 +255,16 @@ long fat32_create_contiguous_file(char* name, long size, long root_dir_sector, l
 	while(len&&(message[len]==' '||message[len]==0)) len--;
 	if (!strcmp(message,name)) {
 	  // ERROR: Name already exists
-	  mega65_serial_monitor_write("File already exists\n");
+	  //	  mega65_serial_monitor_write("File already exists\n");
 	  return 0;
 	}
+
 	// Is the slot free?
 	if (sector_buffer[offset]==0) {
 	  free_dir_sector_num=root_dir_sector+((dir_cluster-2)*sectors_per_cluster)+sn;
 	  free_dir_sector_ofs=offset;
 	  have_dir_slot=1;
-	  mega65_serial_monitor_write("Found free directory slot:\n");
+	  //	  mega65_serial_monitor_write("Found free directory slot:\n");
 	  serial_hex(dir_cluster);
 	  serial_hex(sn);
 	  serial_hex(offset);
@@ -279,15 +285,16 @@ long fat32_create_contiguous_file(char* name, long size, long root_dir_sector, l
       // End of directory -- 
       dir_cluster=fat32_allocate_cluster(last_dir_cluster);
 
-      mega65_serial_monitor_write("Allocating new directory cluster");
+      //      mega65_serial_monitor_write("Allocating new directory cluster");
       serial_hex(dir_cluster);
       
       if ((!dir_cluster)||(dir_cluster>=0xf0000000)) {
 	// Disk full
 	return 0;
       } else {
+
 	// Zero out new directory cluster
-	mega65_serial_monitor_write("Zeroing out new directory cluster\n");
+    //	mega65_serial_monitor_write("Zeroing out new directory cluster\n");
 	serial_hex(dir_cluster);
 	lfill((unsigned long)sector_buffer,0,512);
 	for (sn=0;sn<sectors_per_cluster;sn++) {
@@ -296,9 +303,9 @@ long fat32_create_contiguous_file(char* name, long size, long root_dir_sector, l
       }
     }
   }
-      
+
   // Find where we have enough contiguous space
-  mega65_serial_monitor_write("Search for free disk space\n");
+    //  mega65_serial_monitor_write("Search for free disk space\n");
   contiguous_clusters=0;
   start_cluster=0;
   for(fat_sector_num=0;fat_sector_num <= (fat2_sector-fat1_sector); fat_sector_num++) {
@@ -326,16 +333,15 @@ long fat32_create_contiguous_file(char* name, long size, long root_dir_sector, l
 
   // Abort if the disk is full
   if (contiguous_clusters<clusters) {
-    mega65_serial_monitor_write("Could not find free contiguous space\r\n");
+    //    mega65_serial_monitor_write("Could not find free contiguous space\r\n");
     return 0;
   }
 
-  mega65_serial_monitor_write("Found contiguous space beginning at cluster $");
+  //  mega65_serial_monitor_write("Found contiguous space beginning at cluster $");
   serial_hex(start_cluster);
  
-  
   // Write cluster chain into both FATs
-  mega65_serial_monitor_write("Writing FAT sectors for file\r\n");
+    //  mega65_serial_monitor_write("Writing FAT sectors for file\r\n");
   fat_sector_num=start_cluster/128;
   //  next_cluster=start_cluster+1;
   fat_sector_count=clusters/128;
@@ -356,9 +362,9 @@ long fat32_create_contiguous_file(char* name, long size, long root_dir_sector, l
     sdcard_writesector(fat1_sector+fat_sector_num+k);
     sdcard_writesector(fat2_sector+fat_sector_num+k);
   }  
-  
+
   // Build directory entry
-  mega65_serial_monitor_write("Building directory entry\r\n");  
+    //  mega65_serial_monitor_write("Building directory entry\r\n");  
   sdcard_readsector(free_dir_sector_num);
   // Clear entry
   for (i = 0; i < 32; i++) sector_buffer[free_dir_sector_ofs + i] = 0x00;
@@ -372,9 +378,9 @@ long fat32_create_contiguous_file(char* name, long size, long root_dir_sector, l
   }
   sector_buffer[free_dir_sector_ofs + 0x0b] = 0x20; // Archive bit set
 
-  mega65_serial_monitor_write("Getting RTC timestamp\r\n");    
+  //  mega65_serial_monitor_write("Getting RTC timestamp\r\n");    
   getrtc(&tm);
-  mega65_serial_monitor_write("Got RTC timestamp\r\n");    
+  //  mega65_serial_monitor_write("Got RTC timestamp\r\n");    
 
   j=(tm.tm_hour<<11);
   j|=(tm.tm_min<<5);
@@ -402,9 +408,9 @@ long fat32_create_contiguous_file(char* name, long size, long root_dir_sector, l
   sector_buffer[free_dir_sector_ofs + 0x1F] = (size >> 24l) & 0xff;
 
   sdcard_writesector(free_dir_sector_num);
-  mega65_serial_monitor_write("Wrote DIR sector $");
+  //  mega65_serial_monitor_write("Wrote DIR sector $");
   serial_hex(free_dir_sector_num);
-  mega65_serial_monitor_write("@ offset $");
+  //  mega65_serial_monitor_write("@ offset $");
   serial_hex(free_dir_sector_ofs);
 
   return root_dir_sector + (start_cluster - 2) * 8;
