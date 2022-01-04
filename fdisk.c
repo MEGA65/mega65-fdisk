@@ -37,6 +37,7 @@
 unsigned char slot_magic[16]={0x4d,0x45,0x47,0x41,0x36,0x35,0x42,0x49,0x54,0x53,0x54,0x52,0x45,0x41,0x4d,0x30};
 void flash_readsector(const uint32_t sector_number);
 
+unsigned char have_rom=0;
 
 // When set, it enters batch mode
 unsigned char dont_confirm=0;
@@ -369,7 +370,7 @@ void build_mega65_sys_sector(const uint32_t sys_partition_sectors)
  
 #ifdef __CC65__ 
   write_line("      Freeze and OS Service slots.",0);
-  screen_decimal(screen_line_address-80,slot_count);
+  screen_decimal(screen_line_address-79,slot_count);
 #else
   fprintf(stdout," %5d Freeze and OS Service slots\n",slot_count);
 #endif
@@ -487,7 +488,7 @@ void show_partition_entry(const char i)
   format_decimal((int)report+49,ecylinder,4);
   format_hex((int)report+57,lba_end,8);
 
-  write_line(report,0);
+  write_line(report,2);
 #else
   printf("%02X%c : Start=%3d/%2d/%4d or %08X / End=%3d/%2d/%4d or %08X\n",
 	 id,active&80?'*':' ',
@@ -505,9 +506,9 @@ void show_mbr(void)
   write_line("",0);
 
   if ((sector_buffer[0x1fe]!=0x55)||(sector_buffer[0x1ff]!=0xAA))
-    write_line("Current partition table is invalid.",0);
+    write_line("Current partition table is invalid.",2);
   else {  
-    write_line("Current partition table:",0);
+    write_line("Current partition table:",2);
     for(i=0;i<4;i++) {
       show_partition_entry(i);
     }
@@ -527,23 +528,23 @@ void populate_file_system(void)
   lcopy(0xffd6e00,(unsigned long)sector_buffer,512);
   for(i=0;i<16;i++) {
     if (slot_magic[i]!=sector_buffer[i]) {      
-      write_line("Cannot find valid core in flash slot 0. Will not populate files.",0);
+      write_line("Cannot find valid core in flash slot 0. Will not populate files.",1);
       return;
     }
   }
-  write_line("Found core in slot 0",0);
+  write_line("Found core in slot 0",1);
   file_offset=*(unsigned long *)&sector_buffer[0x73];
   file_count=sector_buffer[0x72];
-  write_line("$         Files in Core, starting at $        .",0);
-  screen_hex(screen_line_address-79,file_count);
-  screen_hex(screen_line_address-42,file_offset);
+  write_line("$         Files in Core, starting at $        .",1);
+  screen_hex(screen_line_address-78,file_count);
+  screen_hex(screen_line_address-41,file_offset);
 
   for(i=0;i<file_count;i++) {
     flash_readsector(file_offset);
     next_offset=*(unsigned long *)&sector_buffer[0];
     file_len=*(unsigned long *)&sector_buffer[4];
-    write_line("Pre-populating file ",0);
-    for(j=0;sector_buffer[8+j];j++) lpoke(screen_line_address-60+j,sector_buffer[8+j]);
+    write_line("Pre-populating file ",1);
+    for(j=0;sector_buffer[8+j];j++) lpoke(screen_line_address-59+j,sector_buffer[8+j]);
 
     // Prepare "EIGHT  THR" formatted DOS filename for fat32_create_contiguous_file
     for(j=0;j<11;j++) eightthree[j]=' '; eightthree[11]=0; k=0;
@@ -552,6 +553,8 @@ void populate_file_system(void)
       else eightthree[k++]=sector_buffer[8+j];
       if (k>=11) break;
     }
+
+    if (!strcmp(&sector_buffer[8],"MEGA65.ROM")) have_rom=1;
 
     // Skip header
     file_offset+=4+4+32;
@@ -569,7 +572,12 @@ void populate_file_system(void)
 	  flash_readsector(file_offset+addr);
 	  sdcard_writesector(first_sector++);
 	}
-    } else write_line("!! Error writing file",0);
+    } else {
+      write_line("!! Error writing file",1);
+#ifdef __CC65__
+      recolour_last_line(2);
+#endif
+    }
     
     
     file_offset=next_offset;
@@ -600,10 +608,14 @@ void main(void)
   // Memory map the SD card sector buffer on MEGA65
   sdcard_map_sector_buffer();
 
-  write_line("Detecting SD card(s) (can take a while)",0);
+  write_line("Detecting SD card(s) (can take a while)",1);
+  write_line("",0);
   
-  write_line("SD Card 0 (Internal SD slot):",0);
-  
+  write_line("SD Card 0 (Internal SD slot):",1);
+#ifdef __CC65__
+    recolour_last_line(0x2c);    
+#endif
+    
   sdcard_select(0);
   if (sdcard_reset()) {
     write_line("No card detected on bus 0",2);
@@ -622,7 +634,10 @@ void main(void)
 
   write_line("",0);
 
-  write_line("SD Card 1 (External microSD slot):",0);
+  write_line("SD Card 1 (External microSD slot):",1);
+#ifdef __CC65__
+    recolour_last_line(0x2c);    
+#endif
 
   sdcard_select(1);
   if (sdcard_reset()) {
@@ -642,7 +657,8 @@ void main(void)
   write_line("",0);
   
   // Make user select SD card
-  write_line("Please select SD card to modify: 0/1",0);
+  POKE(0xd020,6);
+  write_line("Please select SD card to modify: 0/1",1);
 #ifdef __CC65__
   recolour_last_line(7);
   c=0;
@@ -696,12 +712,12 @@ void main(void)
 #else
   // Tell use how many sectors available for partition
   write_line("",0);
-  write_line("$         Sectors available for MEGA65 System partition.",0);
-  screen_hex(screen_line_address-79,sys_partition_sectors);
+  write_line("$         Sectors available for MEGA65 System partition.",1);
+  screen_hex(screen_line_address-78,sys_partition_sectors);
   build_mega65_sys_sector(sys_partition_sectors);
 
-  write_line("$         Sectors available for VFAT32 partition.",0);
-  screen_hex(screen_line_address-79,fat_partition_sectors);
+  write_line("$         Sectors available for VFAT32 partition.",1);
+  screen_hex(screen_line_address-78,fat_partition_sectors);
 #endif
   
   fat_partition_start=0x00000800;
@@ -727,7 +743,7 @@ void main(void)
 	  fs_clusters,fs_clusters,fat_sectors,reserved_sectors);
 #else
   write_line("",0);
-  write_line("Format Card with new partition table and FAT32 file system?",0);
+  write_line("Format Card with new partition table and FAT32 file system?",1);
   recolour_last_line(7);
   {
     char col=6;
@@ -765,11 +781,13 @@ void main(void)
       unsigned char len;
       if (!dont_confirm) {
 	write_line("",0);
-	write_line("Type DELETE EVERYTHING to continue:",0);
+	write_line("Type DELETE EVERYTHING to continue:",1);
 	recolour_last_line(2);
-	write_line("Or type FIX MBR to re-write MBR",0);
+	write_line("Or type FIX MBR to re-write MBR",1);
 	recolour_last_line(2);
-	len=read_line(line_of_input,80);
+	screen_line_address++;
+	len=read_line(line_of_input,79);
+	screen_line_address--;
 	if (len) {
 	  write_line(line_of_input,0);
 	  recolour_last_line(7);
@@ -785,14 +803,14 @@ void main(void)
 	show_mbr();
       write_line("MBR Re-written",0);
       while(1) continue;
-    } else if (strcmp("DELETE EVERYTHING",line_of_input)
-	       &&strcmp("BATCH MODE",line_of_input)) {
-      write_line("Entered text does not match. Try again.",0);
-      recolour_last_line(8);
     } else if (!strcmp("FOLTERLOS MODUS BITTE",line_of_input)) {
 	// Delete cards REPEATEDLY
 	dont_confirm=1;
 	break;
+    } else if (strcmp("DELETE EVERYTHING",line_of_input)
+	       &&strcmp("BATCH MODE",line_of_input)) {
+      write_line("Entered text does not match. Try again.",1);
+      recolour_last_line(8);
     } else
       // String matches -- so proceed
       break;
@@ -802,7 +820,7 @@ void main(void)
   // MBR is always the first sector of a disk
 #ifdef __CC65__
   write_line("",0);
-  write_line("Writing Partition Table / Master Boot Record...",0);
+  write_line("Writing Partition Table / Master Boot Record...",1);
 #endif
   build_mbr(sys_partition_start,
 	    sys_partition_sectors,
@@ -831,16 +849,16 @@ void main(void)
   if (1) {
   // Write MEGA65 System partition header sector
 #ifdef __CC65__
-  write_line("Writing MEGA65 System Partition header sector...",0);
+  write_line("Writing MEGA65 System Partition header sector...",1);
 #endif
   build_mega65_sys_sector(sys_partition_sectors);
   sdcard_writesector(sys_partition_start);
 
 #ifdef __CC65__
-  write_line("Freeze  dir @ $        ",0);
-  screen_hex(screen_line_address-79+14,sys_partition_freeze_dir);
-  write_line("Service dir @ $        ",0);
-  screen_hex(screen_line_address-79+14,sys_partition_service_dir);
+  write_line("Freeze  dir @ $        ",1);
+  screen_hex(screen_line_address-79+15,sys_partition_freeze_dir);
+  write_line("Service dir @ $        ",1);
+  screen_hex(screen_line_address-79+15,sys_partition_service_dir);
   
 #endif
 
@@ -849,11 +867,11 @@ void main(void)
   sdcard_writesector(sys_partition_start+1L);  
   
   // Erase the rest of the 1MB reserved area
-  write_line("Erasing configuration area",0);
+  write_line("Erasing configuration area",1);
   sdcard_erase(sys_partition_start+2,sys_partition_start+1023);
 
   // erase frozen program directory  
-  write_line("Erasing frozen program and system service directories",0);
+  write_line("Erasing frozen program and system service directories",1);
   sdcard_erase(sys_partition_freeze_dir,
 	       sys_partition_freeze_dir+freeze_dir_sectors-1);
   
@@ -864,7 +882,7 @@ void main(void)
   }
     
 #ifdef __CC65__
-  write_line("Writing FAT Boot Sector...",0);
+  write_line("Writing FAT Boot Sector...",1);
 #endif
   // Partition starts at fixed position of sector 2048, i.e., 1MB
   build_dosbootsector(volume_name,
@@ -874,7 +892,7 @@ void main(void)
   sdcard_writesector(fat_partition_start+6); // Backup boot sector at partition + 6
 
 #ifdef __CC65__
-  write_line("Writing FAT Information Block (and backup copy)...",0);
+  write_line("Writing FAT Information Block (and backup copy)...",1);
 #endif
   // FAT32 FS Information block (and backup)
   build_fs_information_sector(fs_clusters);
@@ -886,16 +904,16 @@ void main(void)
   fprintf(stderr,"Writing FATs at offsets 0x%x AND 0x%x\r\n",
 	  fat1_sector*512,fat2_sector*512);
 #else
-  write_line("Writing FATs at $         and $         ...",0);
-  screen_hex(screen_line_address-80+17,fat1_sector*512);
-  screen_hex(screen_line_address-80+31,fat2_sector*512);
+  write_line("Writing FATs at $         and $         ...",1);
+  screen_hex(screen_line_address-80+18,fat1_sector*512);
+  screen_hex(screen_line_address-80+32,fat2_sector*512);
 #endif
   build_empty_fat(); 
   sdcard_writesector(fat_partition_start+fat1_sector);
   sdcard_writesector(fat_partition_start+fat2_sector);
 
 #ifdef __CC65__
-  write_line("Writing Root Directory...",0);
+  write_line("Writing Root Directory...",1);
 #endif
   // Root directory
   build_root_dir(volume_name);
@@ -903,7 +921,7 @@ void main(void)
 
 #ifdef __CC65__
   write_line("",0);
-  write_line("Clearing file system data structures...",0);
+  write_line("Clearing file system data structures...",1);
 #endif
   // Make sure all other sectors are empty
 #if 1
@@ -974,13 +992,20 @@ void main(void)
   
   POKE(0xd021U,6);
   write_line("",0);
-  write_line("SD Card has been formatted.  Remove, Copy MEGA65.ROM, Reinsert AND Reboot.",0);
+  if (!have_rom) 
+    write_line("SD Card has been formatted.  Remove, Copy MEGA65.ROM, Reinsert AND Reboot.",1);
+  else
+    write_line("SD Card has been formatted.  Reboot to continue.",1);
+#ifdef __CC65__
+  // Make it blink!
+  recolour_last_line(0x37);
+#endif
 
   if (!dont_confirm) {
     while(1) continue;
   } else {
 
-    write_line("Press ALMOST ANY KEY to format next card",0);
+    write_line("Press ALMOST ANY KEY to format next card",1);
     while(!PEEK(0xD610)) continue;
     POKE(0xD610,0);
 

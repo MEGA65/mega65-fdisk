@@ -80,17 +80,17 @@ void mega65_fast(void)
 void show_card_size(uint32_t sector_number)
 {
   // Work out size in MB and tell user
-  char col=6;
+  char col=8;
   uint32_t megs=(sector_number+1L)/2048L;
   uint32_t gigs=0;
   if (megs&0xffff0000L) {
     gigs=megs/1024L;
     megs=gigs;
   }
-  screen_decimal(screen_line_address,megs);
-  if (megs<10000) col=5;
-  if (megs<1000) col=4;
-  if (megs<100) col=3;
+  screen_decimal(screen_line_address+2,megs);
+  if (megs<10000) col=7;
+  if (megs<1000) col=6;
+  if (megs<100) col=5;
   if (!gigs)
     write_line("MiB SD CARD FOUND.",col);
   else
@@ -149,8 +149,8 @@ uint32_t sdcard_getsize(void)
   }
 
   // Report number of sectors
-  write_line("Maximum readable sector is $",0);
-  screen_hex(screen_line_address-80+28,sector_number);
+  write_line("Maximum readable sector is $",2);
+  screen_hex(screen_line_address-80+30,sector_number);
   //  screen_decimal(screen_line_address,sector_number/1024L);
   //  write_line("K Sector SD CARD.",6);  
   
@@ -471,8 +471,8 @@ void sdcard_readspeed_test(void)
 
   speed = 10000000L / total_time;
   
-  write_line("SD Card read speed =       KB/sec",0);
-  screen_decimal(screen_line_address-80+21,speed);
+  write_line("SD Card read speed =       KB/sec",2);
+  screen_decimal(screen_line_address-80+23,speed);
 }
 
 #if 0
@@ -688,7 +688,7 @@ void sdcard_erase(const uint32_t first_sector,const uint32_t last_sector)
 #endif
     
     // Show count-down
-    screen_decimal(screen_line_address,last_sector-n);
+    screen_decimal(screen_line_address+1,last_sector-n);
     //    fprintf(stderr,"."); fflush(stderr);
   }
 

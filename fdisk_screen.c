@@ -17,9 +17,9 @@ char screen_column=0;
 
 #ifdef __CC65__
 unsigned char *footer_messages[FOOTER_MAX+1]={
-  "MEGA65 FDISK+FORMAT V00.21 : (C) COPYRIGHT 2017-2022 PAUL GARDNER-STEPHEN ETC.  ",
+  " MEGA65 FDISK+FORMAT V00.22 : (C) COPYRIGHT 2017-2022 PAUL GARDNER-STEPHEN ETC. ",
   "                                                                                ",
-  "A FATAL ERROR HAS OCCURRED, SORRY.                                              "
+  " A FATAL ERROR HAS OCCURRED, SORRY.                                             "
 };
 
 unsigned char screen_hex_buffer[6];
@@ -214,6 +214,7 @@ void setup_screen(void)
   POKE(0xD021U,6);
 
   // Shove screen right one pixel, as the C65 BASIC does in 80 column mode
+  // XXX For some reason in this mode its still one pixel out, so move it two
   POKE(0xD016,0xC9);
   
   // Clear screen RAM
