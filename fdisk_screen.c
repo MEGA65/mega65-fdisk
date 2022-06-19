@@ -241,15 +241,15 @@ void screen_colour_line(unsigned char line,unsigned char colour)
 }
 #endif
 
-static unsigned char i;
+static unsigned char fatal_i;
 
 #ifdef __CC65__
 void fatal_error(unsigned char *filename, unsigned int line_number)
 {
   display_footer(FOOTER_FATAL);
-  for(i=0;filename[i];i++) POKE(FOOTER_ADDRESS+44+i,filename[i]);
-  POKE(FOOTER_ADDRESS+44+i,':'); i++;
-  screen_decimal(FOOTER_ADDRESS+44+i,line_number);
+  for(fatal_i=0;filename[fatal_i];fatal_i++) POKE(FOOTER_ADDRESS+44+fatal_i,filename[fatal_i]);
+  POKE(FOOTER_ADDRESS+44+fatal_i,':'); fatal_i++;
+  screen_decimal(FOOTER_ADDRESS+44+fatal_i,line_number);
   lfill(COLOUR_RAM_ADDRESS-SCREEN_ADDRESS+FOOTER_ADDRESS,2|ATTRIB_REVERSE,80);
   for(;;) continue;
 }
@@ -268,7 +268,7 @@ void set_screen_attributes(long p,unsigned char count,unsigned char attr)
   // map the 2KB colour RAM in at $D800 and work with it there.
   // XXX - For now we are LPOKING
   long addr=COLOUR_RAM_ADDRESS-SCREEN_ADDRESS+p;
-  for(i=0;i<count;i++) {
+  for(fatal_i=0;fatal_i<count;fatal_i++) {
     lpoke(addr,lpeek(addr)|attr);
     addr++;
   }

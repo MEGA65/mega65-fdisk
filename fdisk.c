@@ -515,13 +515,13 @@ void show_mbr(void)
   }
 }
 
-unsigned char i,j,k,file_count;
+unsigned char file_count;
 unsigned long file_offset,next_offset,file_len,first_sector;
 char eightthree[8+3+1];
 
 void populate_file_system(void)
 {
-  
+  unsigned char i,j,k;
   /* Check if flash slot 0 contains embedded files that we should write to the SD card.
    */
   flash_readsector(0);
