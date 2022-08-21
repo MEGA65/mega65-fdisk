@@ -1,12 +1,12 @@
 #define SCREEN_ADDRESS (0x8000U)
 #define CHARSET_ADDRESS (0x8800U)
 #define COLOUR_RAM_ADDRESS (0x1f800)
-#define FOOTER_ADDRESS (SCREEN_ADDRESS+24*80)
+#define FOOTER_ADDRESS (SCREEN_ADDRESS + 24 * 80)
 
-#define FOOTER_COPYRIGHT     0
-#define FOOTER_BLANK         1
-#define FOOTER_FATAL         2
-#define FOOTER_MAX           2
+#define FOOTER_COPYRIGHT 0
+#define FOOTER_BLANK 1
+#define FOOTER_FATAL 2
+#define FOOTER_MAX 2
 
 #define ATTRIB_REVERSE 0x20
 #define ATTRIB_BLINK 0x10
@@ -41,19 +41,19 @@ void footer_save(void);
 void footer_restore(void);
 void display_buffer_position_footer(char bid);
 
-void screen_colour_line(unsigned char line,unsigned char colour);
-#define screen_colour_line_segment(LA,W,C) lfill(LA+(0x1f800-SCREEN_ADDRESS),C,W)
+void screen_colour_line(unsigned char line, unsigned char colour);
+#define screen_colour_line_segment(LA, W, C) lfill(LA + (0x1f800 - SCREEN_ADDRESS), C, W)
 
-void screen_hex(unsigned int addr,long value);
-void screen_hex_byte(unsigned int addr,long value);
-void screen_decimal(unsigned int addr,unsigned int value);
-void set_screen_attributes(long p,unsigned char count,unsigned char attr);
-void write_line(char *s,char col);
+void screen_hex(unsigned int addr, long value);
+void screen_hex_byte(unsigned int addr, long value);
+void screen_decimal(unsigned int addr, unsigned int value);
+void set_screen_attributes(long p, unsigned char count, unsigned char attr);
+void write_line(char *s, char col);
 void recolour_last_line(char colour);
-char read_line(char *buffer,unsigned char maxlen);
+char read_line(char *buffer, unsigned char maxlen);
 
-void format_decimal(const int addr,const int value, const char columns);
-void format_hex(const int addr,const long value, const char columns);
+void format_decimal(const int addr, const int value, const char columns);
+void format_hex(const int addr, const long value, const char columns);
 
 extern long screen_line_address;
 
@@ -61,4 +61,4 @@ extern unsigned char ascii_map[256];
 #define ascii_to_screen(X) ascii_map[X]
 
 void fatal_error(unsigned char *filename, unsigned int line_number);
-#define FATAL_ERROR fatal_error(__FILE__,__LINE__)
+#define FATAL_ERROR fatal_error(__FILE__, __LINE__)
