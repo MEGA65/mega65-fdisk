@@ -42,6 +42,14 @@ DATAFILES=	ascii8x8.bin
 
 all:	$(FILES)
 
+format:
+	submodules=""; for sm in `git submodule | awk '{ print "./" $$2 }'`; do \
+		submodules="$$submodules -o -path $$sm"; \
+	done; \
+	find . -type d \( $${submodules:3} \) -prune -false -o \( -iname '*.h' -o -iname '*.c' -o -iname '*.cpp' \) -print0 | xargs -0 clang-format --style=file -i --verbose
+
+.PHONY: format
+
 $(CL65):
 $(CC65):
 	$(warning ======== Making: $@)
