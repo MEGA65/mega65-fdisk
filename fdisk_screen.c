@@ -17,18 +17,19 @@ char screen_column = 0;
 
 #ifdef __CC65__
 unsigned char *footer_messages[FOOTER_MAX + 1] = {
-  " MEGA65 FDISK+FORMAT V00.23 : (C) COPYRIGHT 2017-2022 PAUL GARDNER-STEPHEN ETC. ",
+  " MEGA65 FDISK+FORMAT V00.24 : (C) COPYRIGHT 2017-2022 PAUL GARDNER-STEPHEN ETC. ",
   "                                                                                ",
   " A FATAL ERROR HAS OCCURRED, SORRY.                                             "
 };
 
 unsigned char screen_hex_buffer[6];
 
-unsigned char screen_hex_digits[16] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 0x41, 0x42, 0x43, 0x44, 0x45,
-  0x46 };
 unsigned char to_screen_hex(unsigned char c)
 {
-  return screen_hex_digits[c & 0xf];
+  c &= 0xf;
+  if (c > 9)
+    return 0x37 + c;
+  return 0x30 + c;
 }
 
 void screen_hex_byte(unsigned int addr, long value)
@@ -106,9 +107,6 @@ unsigned char ii, j, carry, temp;
 unsigned int value;
 void screen_decimal(unsigned int addr, unsigned int v)
 {
-  // XXX - We should do this off-screen and copy into place later, to avoid glitching
-  // on display.
-
   value = v;
 
   // Start with all zeros

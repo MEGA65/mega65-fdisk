@@ -36,9 +36,18 @@
 
 unsigned char slot_magic[16] = { 0x4d, 0x45, 0x47, 0x41, 0x36, 0x35, 0x42, 0x49, 0x54, 0x53, 0x54, 0x52, 0x45, 0x41, 0x4d,
   0x30 };
-void flash_readsector(const uint32_t sector_number);
 
-unsigned char have_rom = 0;
+unsigned char have_rom = 0, have_sdfiles = 0;
+uint8_t hardware_model_id = 0xff;
+unsigned long slot_size = 8L * 1048576L;
+
+#define MAX_SLOT 8
+typedef struct {
+  char version[32];
+  unsigned char file_count;
+  unsigned long file_offset;
+} mega65slotT;
+mega65slotT mega65slot[MAX_SLOT];
 
 // When set, it enters batch mode
 unsigned char dont_confirm = 0;
@@ -175,7 +184,7 @@ uint8_t boot_bytes[258] = {
 
 };
 
-void build_dosbootsector(const uint8_t volume_name[11], uint32_t data_sectors, uint32_t fs_sectors_per_fat)
+void build_dosbootsector(uint32_t data_sectors, uint32_t fs_sectors_per_fat)
 {
   uint16_t i;
 
@@ -504,34 +513,65 @@ void show_mbr(void)
   }
 }
 
+char buffer[80];
 unsigned char file_count;
 unsigned long file_offset, next_offset, file_len, first_sector;
 char eightthree[8 + 3 + 1];
 
-void populate_file_system(void)
+void scan_slots(void)
+{
+  unsigned char i, j;
+
+  hardware_model_id = PEEK(0xD629);
+  if (hardware_model_id == 3)
+    slot_size = 1048576L * 8; // 8MB slots for mega65r3 platform
+  else
+    slot_size = 1048576L * 4;
+
+  for (i = 0; i < MAX_SLOT; i++) {
+    mega65slot[i].version[0] = 0;
+    mega65slot[i].file_count = 0;
+    mega65slot[i].file_offset = 0;
+    flash_readsector(i * slot_size);
+    lcopy(0xffd6e00, (unsigned long)sector_buffer, 512);
+    for (j = 0; j < 16; j++)
+      if (slot_magic[j] != sector_buffer[j])
+        break;
+    if (j < 16) continue;
+    for (j = 0; j < 6; j++)
+      if (slot_magic[j] != sector_buffer[16 + j]) // check MEGA65 slot
+        break;
+    if (j < 6) continue;
+    for (j = 0; j < 32; j++)
+      mega65slot[i].version[j] = sector_buffer[48 + j];
+    mega65slot[i].version[j] = 0;
+    for (j--; mega65slot[i].version[j] == ' ' && j > 0 ; j--);
+    mega65slot[i].file_count = sector_buffer[0x72];
+    mega65slot[i].file_offset = i * slot_size + *(unsigned long *)&sector_buffer[0x73];
+  }
+}
+
+char populate_file_system(unsigned char slot)
 {
   unsigned char i, j, k;
-  /* Check if flash slot 0 contains embedded files that we should write to the SD card.
-   */
-  flash_readsector(0);
-  lcopy(0xffd6e00, (unsigned long)sector_buffer, 512);
-  for (i = 0; i < 16; i++) {
-    if (slot_magic[i] != sector_buffer[i]) {
-      write_line("Cannot find valid core in flash slot 0. Will not populate files.", 1);
-      return;
-    }
-  }
-  write_line("Found core in slot 0", 1);
-  file_offset = *(unsigned long *)&sector_buffer[0x73];
-  file_count = sector_buffer[0x72];
-  write_line("$         Files in Core, starting at $        .", 1);
-  screen_hex(screen_line_address - 78, file_count);
-  screen_hex(screen_line_address - 41, file_offset);
+  char *pos;
+
+  if (!mega65slot[slot].version[0] || !mega65slot[slot].file_count)
+    return 1;
+
+  strcpy(buffer, "Using files embedded in slot @");
+  pos = strchr(buffer, '@');
+  *pos = 0x30 + slot;
+  write_line(buffer, 1);
+  file_offset = mega65slot[slot].file_offset;
+  file_count = mega65slot[slot].file_count;
+  write_line("   Files in Core, starting at $        .", 1);
+  format_decimal(screen_line_address - 79, file_count, 2);
+  screen_hex(screen_line_address - 48, file_offset);
 
   for (i = 0; i < file_count; i++) {
-
     flash_readsector(file_offset);
-    next_offset = *(unsigned long *)&sector_buffer[0];
+    next_offset = slot * slot_size + *(unsigned long *)&sector_buffer[0];
     file_len = *(unsigned long *)&sector_buffer[4];
     write_line("Pre-populating file ", 1);
     for (j = 0; sector_buffer[8 + j]; j++)
@@ -584,7 +624,7 @@ void populate_file_system(void)
     file_offset = next_offset;
   }
 
-  return;
+  return 0;
 }
 
 #ifdef __CC65__
@@ -593,8 +633,9 @@ void main(void)
 int main(int argc, char **argv)
 #endif
 {
-  unsigned char c;
+  unsigned char key, cardSlot, slotAvail;
 
+rescanSlots:
 #ifdef __CC65__
   mega65_fast();
   setup_screen();
@@ -602,8 +643,8 @@ int main(int argc, char **argv)
 next_card:
 #endif
 
+  slotAvail = 0;
   sdcard_select(0);
-
   sdcard_open();
 
   // Memory map the SD card sector buffer on MEGA65
@@ -632,10 +673,11 @@ next_card:
 
     // Show summary of current MBR
     show_mbr();
+
+    slotAvail |= 1;
   }
 
   write_line("", 0);
-
   write_line("SD Card 1 (External microSD slot):", 1);
 #ifdef __CC65__
   recolour_last_line(0x2c);
@@ -656,19 +698,31 @@ next_card:
 
     // Show summary of current MBR
     show_mbr();
+
+    slotAvail |= 2;
   }
   write_line("", 0);
 
   // Make user select SD card
   POKE(0xd020, 6);
-  write_line("Please select SD card to modify: 0/1", 1);
+  strcpy(buffer, "Please select SD card to modify or r to rescan (");
+  if (slotAvail&1)
+    strcat(buffer, "0/");
+  if (slotAvail&2)
+    strcat(buffer, "1/");
+  strcat(buffer, "r): ");
+  write_line(buffer, 1);
 #ifdef __CC65__
   recolour_last_line(7);
-  c = 0;
-  while (c < 0x30 || c > 0x31) {
-    c = mega65_getkey();
-  }
-  sdcard_select(c);
+
+  do {
+    key = mega65_getkey();
+  } while (key != 'r' && (!(slotAvail&1) || key != '0') && (!(slotAvail&2) || key != '1'));
+  if (key == 'r')
+    goto rescanSlots;
+
+  cardSlot = key & 1;
+  sdcard_select(cardSlot);
 #endif
 
   // Then make sure we have correct information for the selected card
@@ -736,7 +790,7 @@ next_card:
   fs_data_sectors = fs_clusters * sectors_per_cluster;
 
 #ifndef __CC65__
-  printf("Type DELETE EVERYTHING to delete everything.\n");
+  printf("Type DELETE EVERYTHING to delete everything on %s SD.\n", cardSlot&1 ? "external" : "internal");
   char line[1024];
   fgets(line, 1024, stdin);
   while (line[0] && line[strlen(line) - 1] == '\n')
@@ -752,7 +806,10 @@ next_card:
       fs_clusters, fat_sectors, reserved_sectors);
 #else
   write_line("", 0);
-  write_line("Format Card with new partition table and FAT32 file system?", 1);
+  strcpy(buffer, "Format ");
+  strcat(buffer, cardSlot&1 ? "external" : "internal");
+  strcat(buffer, " Card with new partition table and FAT32 file system?");
+  write_line(buffer, 1);
   recolour_last_line(7);
   {
     char col = 6;
@@ -793,24 +850,26 @@ next_card:
   //  multisector_write_test();
 
   while (1) {
-    char line_of_input[80];
     unsigned char len;
     if (!dont_confirm) {
       write_line("", 0);
-      write_line("Type DELETE EVERYTHING to continue:", 1);
+      strcpy(buffer, "Type DELETE EVERYTHING to continue formatting the ");
+      strcat(buffer, cardSlot&1 ? "external" : "internal");
+      strcat(buffer, " SD");
+      write_line(buffer, 1);
       recolour_last_line(2);
-      write_line("Or type FIX MBR to re-write MBR", 1);
+      write_line("or type FIX MBR to re-write MBR:", 1);
       recolour_last_line(2);
       screen_line_address++;
-      len = read_line(line_of_input, 79);
+      len = read_line(buffer, 79);
       screen_line_address--;
       if (len) {
-        write_line(line_of_input, 1);
+        write_line(buffer, 1);
         recolour_last_line(7);
       }
     }
 
-    if (!strcmp("FIX MBR", line_of_input)) {
+    if (!strcmp("FIX MBR", buffer)) {
       build_mbr(sys_partition_start, sys_partition_sectors, fat_partition_start, fat_partition_sectors);
       sdcard_writesector(0);
       show_mbr();
@@ -818,12 +877,12 @@ next_card:
       while (1)
         continue;
     }
-    else if (!strcmp("FOLTERLOS MODUS BITTE", line_of_input)) {
+    else if (!strcmp("FOLTERLOS MODUS BITTE", buffer)) {
       // Delete cards REPEATEDLY
       dont_confirm = 1;
       break;
     }
-    else if (strcmp("DELETE EVERYTHING", line_of_input) && strcmp("BATCH MODE", line_of_input)) {
+    else if (strcmp("DELETE EVERYTHING", buffer) && strcmp("BATCH MODE", buffer)) {
       write_line("Entered text does not match. Try again.", 1);
       recolour_last_line(8);
     }
@@ -890,7 +949,7 @@ next_card:
   write_line("Writing FAT Boot Sector...", 1);
 #endif
   // Partition starts at fixed position of sector 2048, i.e., 1MB
-  build_dosbootsector(volume_name, fat_partition_sectors, fat_sectors);
+  build_dosbootsector(fat_partition_sectors, fat_sectors);
   sdcard_writesector(fat_partition_start);
   sdcard_writesector(fat_partition_start + 6); // Backup boot sector at partition + 6
 
@@ -924,6 +983,7 @@ next_card:
 #ifdef __CC65__
   write_line("", 0);
   write_line("Clearing file system data structures...", 1);
+  POKE(0xd020U, 6);
 #endif
   // Make sure all other sectors are empty
 #if 1
@@ -937,7 +997,46 @@ next_card:
 #ifdef __CC65__
   /* Check if flash slot 0 contains embedded files that we should write to the SD card.
    */
-  populate_file_system();
+  write_line("          ", 0);
+  write_line("Scanning core for embedded files...", 1);
+  scan_slots();
+  {
+    unsigned char i, slotCount, slotActive;
+    slotCount = 0;
+    slotActive = 0;
+    for (i = 0; i < MAX_SLOT; i++) {
+      if (!mega65slot[i].version[0] || !mega65slot[i].file_count) continue;
+      strcpy(buffer, "(#) MEGA65 -    Files");
+      buffer[1] = 0x30 + i;
+      format_decimal((int)buffer + 13, mega65slot[i].file_count, 2);
+      write_line(buffer, 3);
+      write_line(mega65slot[i].version, 7);
+      if (mega65slot[i].file_count) {
+        slotCount++;
+        slotActive |= 1<<i;
+      }
+    }
+    if (!slotCount) {
+      write_line("No slots with files found, skipping population.",1);
+      recolour_last_line(7);
+    }
+    else {
+      write_line("Populate SD card with embedded files from slot # or s to skip (#/s)?", 1);
+      recolour_last_line(7);
+      do {
+        key = mega65_getkey();
+        if (key == 's')
+          break;
+        for (i=0; i < MAX_SLOT; i++)
+          if ((slotActive & (1<<i)) && key == 0x30 + i)
+            break;
+      } while (i == MAX_SLOT);
+      if (key != 's')
+        have_sdfiles = !populate_file_system(key&7);
+      else
+        write_line("Skipping SD card population.", 1);
+    }
+  }
 #else
 
   // Process loading and reading of files from disk image
@@ -989,16 +1088,18 @@ next_card:
 
 #ifdef __CC65__
 
+  POKE(0xd020U, 6);
   POKE(0xd021U, 6);
   write_line("", 0);
-  if (!have_rom)
-    write_line("SD Card has been formatted.  Remove, Copy MEGA65.ROM, Reinsert AND Reboot.", 1);
-  else
-    write_line("SD Card has been formatted.  Reboot to continue.", 1);
-#ifdef __CC65__
-  // Make it blink!
+  write_line("SD Card has been formatted.", 1);
   recolour_last_line(0x37);
-#endif
+  if (!have_sdfiles)
+    write_line("Remove, Copy SD Essentials and MEGA65.ROM, reinsert AND reboot.", 1);
+  else if (!have_rom)
+    write_line("Remove, Copy MEGA65.ROM, reinsert AND reboot.", 1);
+  else
+    write_line("Reboot to continue.", 1);
+  recolour_last_line(0x37);
 
   if (!dont_confirm) {
     while (1)
