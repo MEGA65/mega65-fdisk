@@ -1,3 +1,22 @@
+# Operating System detection and conditional compile options
+
+ifeq ($(OS),Windows_NT)
+    OSYSTEM := Windows
+else
+    OSYSTEM := $(shell sh -c 'uname 2>/dev/null || echo Unknown')
+endif
+
+ifeq ($(OSYSTEM),Windows) # MS Windows
+    GCOPT +=
+endif
+
+ifeq ($(OSYSTEM),Darwin) # Apple macOS
+    GCOPT += -I/opt/homebrew/include -L/opt/homebrew/lib -Wno-unknown-pragmas
+endif
+
+ifeq ($(OSYSTEM),Linux) # Linux
+    GCOPT += -I/usr/local/include -L/usr/local/lib
+endif
 
 ifdef USE_LOCAL_CC65
 	# use locally installed binary (requires cc65 to be in the $PATH)
@@ -74,7 +93,7 @@ ascii.h:	asciih
 
 pngprepare:	pngprepare.c
 	$(warning ======== Making: $@)
-	$(CC) -I/usr/local/include -L/usr/local/lib -o pngprepare pngprepare.c -lpng
+	$(CC) $(GCOPT) -o pngprepare pngprepare.c -lpng
 
 m65fdisk.prg:	$(ASSFILES) $(DATAFILES) $(CC65)
 	$(warning ======== Making: $@)
