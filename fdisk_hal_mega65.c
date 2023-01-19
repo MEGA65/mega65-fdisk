@@ -681,6 +681,10 @@ void sdcard_erase(const uint32_t first_sector, const uint32_t last_sector)
       // First sector of multi-sector write
       POKE(sd_ctl, 0x04);
     }
+    else if (n == last_sector) {
+      // Last sector of multi-sector write
+      POKE(sd_ctl, 0x06);
+    }
     else
       // All other sectors
       POKE(sd_ctl, 0x05);
@@ -701,18 +705,4 @@ void sdcard_erase(const uint32_t first_sector, const uint32_t last_sector)
     screen_decimal(screen_line_address + 1, last_sector - n);
     //    fprintf(stderr,"."); fflush(stderr);
   }
-
-#ifndef NOFAST_ERASE
-  // Then say when we are done
-  POKE(sd_ctl, 0x57); // open SD card write gate
-  POKE(sd_ctl, 0x06);
-
-  // Wait for SD card to go busy
-  while (!(PEEK(sd_ctl) & 3))
-    continue;
-
-  // Wait for SD card to go ready
-  while (PEEK(sd_ctl) & 3)
-    continue;
-#endif
 }
