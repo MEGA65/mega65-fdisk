@@ -289,7 +289,7 @@ uint32_t fat1_sector = 0;
 uint32_t fat2_sector = 0;
 uint32_t fs_data_sectors = 0;
 uint8_t sectors_per_cluster = 8; // 4KB clusters
-uint8_t volume_name[11] = "MEGA65";
+uint8_t volume_name[11] = "MEGA65FDISK";
 
 // Work out maximum number of clusters we can accommodate
 uint32_t sectors_required;
