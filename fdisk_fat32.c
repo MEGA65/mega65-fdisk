@@ -364,7 +364,7 @@ long fat32_create_contiguous_file(char *name, long size, long root_dir_sector, l
   fat_sector_count = clusters / 128;
   if (clusters & 127)
     fat_sector_count++;
-  for (k = 0; k <= fat_sector_count; k++) {
+  for (k = 0; k < fat_sector_count; k++) {
     // Fill FAT sector with chain
     for (offset = 0; offset < 512; offset += 4) {
       if (((k << 7) + (offset >> 2)) < clusters) {
