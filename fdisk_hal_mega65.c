@@ -265,9 +265,9 @@ void sdcard_readsector(const uint32_t sector_number)
   do_read_sector(0x02, sector_number);
 }
 
-void flash_readsector(const uint32_t sector_number)
+void flash_read512bytes(const uint32_t byte_offset)
 {
-  do_read_sector(0x53, sector_number);
+  do_read_sector(0x53, byte_offset);
 }
 
 uint8_t verify_buffer[512];
@@ -304,7 +304,7 @@ void sdcard_writesector(const uint32_t sector_number)
   // Copy the read data to a buffer for verification
   lcopy(sd_sectorbuffer, (long)verify_buffer, 512);
 
-  // VErify that it matches the data we wrote
+  // Verify that it matches the data we wrote
   for (i = 0; i < 512; i++) {
     if (sector_buffer[i] != verify_buffer[i])
       break;

@@ -82,7 +82,7 @@ m65fdisk.prg:	$(ASSFILES) $(DATAFILES) $(CC65)
 
 m65fdisk:	$(HEADERS) Makefile fdisk.c fdisk_fat32.c fdisk_hal_unix.c fdisk_memory.c fdisk_screen.c
 	$(warning ======== Making: $@)
-	gcc -Wall -Wno-char-subscripts -o m65fdisk fdisk.c fdisk_fat32.c fdisk_hal_unix.c fdisk_memory.c fdisk_screen.c
+	gcc -Wall -Wno-char-subscripts -g -O0 -o m65fdisk fdisk.c fdisk_fat32.c fdisk_hal_unix.c fdisk_memory.c fdisk_screen.c
 
 clean:
 	rm -f $(FILES) m65fdisk.map \

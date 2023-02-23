@@ -154,4 +154,14 @@ void m65_io_enable(void)
 void m65_io_enable(void)
 {
 }
+
+void lfill(long destination_address, unsigned char value, unsigned int count)
+{
+  memset((void*)destination_address, value, count);
+}
+
+void lcopy(long source_address, long destination_address, unsigned int count)
+{
+  memcpy((void*)destination_address, (void*)source_address, count);
+}
 #endif

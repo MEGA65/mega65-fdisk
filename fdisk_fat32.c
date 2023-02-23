@@ -67,7 +67,9 @@ void serial_hex(unsigned long v)
   //  mega65_serial_monitor_write(shbuf);
 }
 
+#ifdef __CC65__
 #define detect_target() (lpeek(0xffd3629))
+#endif
 #define TARGET_UNKNOWN 0
 #define TARGET_MEGA65R1 1
 #define TARGET_MEGA65R2 2
@@ -93,6 +95,7 @@ struct m65_tm {
 
 unsigned char db1, db2, db3;
 
+#ifdef __CC65__
 unsigned char lpeek_debounced(long address)
 {
   db1 = 0;
@@ -104,6 +107,7 @@ unsigned char lpeek_debounced(long address)
   }
   return db1;
 }
+#endif
 
 unsigned char bcd_work;
 
@@ -120,6 +124,7 @@ unsigned char unbcd(unsigned char in)
 
 void getrtc(struct m65_tm *tm)
 {
+#ifdef __CC65__
   if (!tm)
     return;
 
@@ -161,6 +166,7 @@ void getrtc(struct m65_tm *tm)
   default:
     return;
   }
+#endif
 }
 
 unsigned long fat32_follow_cluster(unsigned long cluster)

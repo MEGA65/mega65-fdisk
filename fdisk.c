@@ -36,6 +36,13 @@
 #include "ascii.h"
 #endif
 
+#ifdef __CC65__
+#define xcopy(str, addr, len) lcopy((unsigned long)str, (unsigned long)addr, len);
+#else
+#define xcopy(str, addr, len) bcopy(str, addr, len);
+#endif
+
+
 unsigned char slot_magic[16] = { 0x4d, 0x45, 0x47, 0x41, 0x36, 0x35, 0x42, 0x49, 0x54, 0x53, 0x54, 0x52, 0x45, 0x41, 0x4d,
   0x30 };
 
@@ -43,7 +50,12 @@ unsigned char have_rom = 0, have_sdfiles = 0;
 uint8_t hardware_model_id = 0xff;
 unsigned long slot_size = 8L * 1048576L;
 
+#ifdef __CC65__
 #define MAX_SLOT 8
+#else
+#define MAX_SLOT 1
+#endif
+
 typedef struct {
   char version[32];
   unsigned char file_count;
@@ -193,7 +205,7 @@ void build_dosbootsector(uint32_t data_sectors, uint32_t fs_sectors_per_fat)
   clear_sector_buffer();
 
   // Start with template, and then modify relevant fields */
-  lcopy((unsigned long)boot_bytes, (unsigned long)sector_buffer, sizeof(boot_bytes));
+  xcopy(boot_bytes, sector_buffer, sizeof(boot_bytes));
 
   // 0x20-0x23 = 32-bit number of data sectors in file system
   for (i = 0; i < 4; i++)
@@ -523,19 +535,26 @@ char eightthree[8 + 3 + 1];
 void scan_slots(void)
 {
   unsigned char i, j;
+#ifdef __CC65__
 
   hardware_model_id = PEEK(0xD629);
   if (hardware_model_id == 3)
     slot_size = 1048576L * 8; // 8MB slots for mega65r3 platform
   else
     slot_size = 1048576L * 4;
+#else
+  // assume 8MB slot size for unix-based m65fdisk
+  slot_size = 1048576L * 8; // 8MB slots for mega65r3 platform
+#endif
 
   for (i = 0; i < MAX_SLOT; i++) {
     mega65slot[i].version[0] = 0;
     mega65slot[i].file_count = 0;
     mega65slot[i].file_offset = 0;
-    flash_readsector(i * slot_size);
+    flash_read512bytes(i * slot_size);
+#ifdef __CC65__
     lcopy(0xffd6e00, (unsigned long)sector_buffer, 512);
+#endif
     for (j = 0; j < 16; j++)
       if (slot_magic[j] != sector_buffer[j])
         break;
@@ -549,7 +568,11 @@ void scan_slots(void)
     mega65slot[i].version[j] = 0;
     for (j--; mega65slot[i].version[j] == ' ' && j > 0 ; j--);
     mega65slot[i].file_count = sector_buffer[0x72];
+#ifdef __CC65__
     mega65slot[i].file_offset = i * slot_size + *(unsigned long *)&sector_buffer[0x73];
+#else
+    mega65slot[i].file_offset = i * slot_size + *(unsigned int *)&sector_buffer[0x73];
+#endif
   }
 }
 
@@ -568,16 +591,29 @@ char populate_file_system(unsigned char slot)
   file_offset = mega65slot[slot].file_offset;
   file_count = mega65slot[slot].file_count;
   write_line("   Files in Core, starting at $        .", 1);
+#ifdef __CC65__
   format_decimal(screen_line_address - 79, file_count, 2);
   screen_hex(screen_line_address - 48, file_offset);
+#endif
 
   for (i = 0; i < file_count; i++) {
-    flash_readsector(file_offset);
+    flash_read512bytes(file_offset);
+#ifdef __CC65__
     next_offset = slot * slot_size + *(unsigned long *)&sector_buffer[0];
     file_len = *(unsigned long *)&sector_buffer[4];
+#else
+    next_offset = slot * slot_size + *(unsigned int *)&sector_buffer[0];
+    file_len = *(unsigned int *)&sector_buffer[4];
+#endif
     write_line("Pre-populating file ", 1);
     for (j = 0; sector_buffer[8 + j]; j++)
+#ifdef __CC65__
       lpoke(screen_line_address - 59 + j, sector_buffer[8 + j]);
+#else
+      printf("%c", sector_buffer[8+j]);
+
+    printf("\n");
+#endif
 #ifdef __CC65__
     recolour_last_line(8);
 #endif
@@ -609,7 +645,7 @@ char populate_file_system(unsigned char slot)
       unsigned long addr;
       for (addr = 0; addr <= file_len; addr += 512) {
         POKE(0xD020, PEEK(0xD020) + 1);
-        flash_readsector(file_offset + addr);
+        flash_read512bytes(file_offset + addr);
         sdcard_writesector(first_sector++);
       }
 #ifdef __CC65__
@@ -947,17 +983,13 @@ next_card:
     sdcard_erase(sys_partition_service_dir, sys_partition_service_dir + service_dir_sectors - 1);
   }
 
-#ifdef __CC65__
   write_line("Writing FAT Boot Sector...", 1);
-#endif
   // Partition starts at fixed position of sector 2048, i.e., 1MB
   build_dosbootsector(fat_partition_sectors, fat_sectors);
   sdcard_writesector(fat_partition_start);
   sdcard_writesector(fat_partition_start + 6); // Backup boot sector at partition + 6
 
-#ifdef __CC65__
   write_line("Writing FAT Information Block (and backup copy)...", 1);
-#endif
   // FAT32 FS Information block (and backup)
   build_fs_information_sector(fs_clusters);
   sdcard_writesector(fat_partition_start + 1);
@@ -996,7 +1028,6 @@ next_card:
   sdcard_erase(fat_partition_start + rootdir_sector + 1, fat_partition_start + rootdir_sector + 1 + sectors_per_cluster - 1);
 #endif
 
-#ifdef __CC65__
   /* Check if flash slot 0 contains embedded files that we should write to the SD card.
    */
   write_line("          ", 0);
@@ -1039,8 +1070,7 @@ next_card:
         write_line("Skipping SD card population.", 1);
     }
   }
-#else
-
+#ifdef SKIPFORNOW
   // Process loading and reading of files from disk image
   printf("Processing %d arguments.\n", argc);
   for (int i = 1; i < argc; i++) {
