@@ -38,7 +38,7 @@ DATAFILES=	ascii8x8.bin
 
 %.s:	%.c $(HEADERS) $(DATAFILES) $(CC65)
 	$(warning ======== Making: $@)
-	$(CC65) $(COPTS) -o $@ $<
+	$(CC65) $(COPTS) --add-source -o $@ $<
 
 all:	$(FILES)
 
@@ -78,7 +78,7 @@ pngprepare:	pngprepare.c
 
 m65fdisk.prg:	$(ASSFILES) $(DATAFILES) $(CC65)
 	$(warning ======== Making: $@)
-	$(CL65) $(COPTS) $(LOPTS) -vm -m m65fdisk.map -o m65fdisk.prg $(ASSFILES)
+	$(CL65) $(COPTS) $(LOPTS) -vm -m m65fdisk.map --listing m65fdisk.list -Ln m65fdisk.label -o m65fdisk.prg $(ASSFILES)
 
 m65fdisk:	$(HEADERS) Makefile fdisk.c fdisk_fat32.c fdisk_hal_unix.c fdisk_memory.c fdisk_screen.c
 	$(warning ======== Making: $@)
