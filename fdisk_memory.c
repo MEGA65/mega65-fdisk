@@ -151,6 +151,8 @@ void m65_io_enable(void)
   POKE(0, 65);
 }
 #else
+#include <string.h>
+
 void m65_io_enable(void)
 {
 }

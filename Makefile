@@ -109,7 +109,7 @@ endef
 # Gives two targets of:
 # - gtest/bin/m65fdisk.test
 # - gtest/bin/m65fdisk.test.exe
-$(eval $(call LINUX_AND_MINGW_GTEST_TARGETS, $(GTESTBINDIR)/m65fdisk.test, $(GTESTDIR)/m65fdisk_test.cpp $(UNIX_M65FDISK_SRC) Makefile, -DGURCE_DUMMY_PLEASE_DELETE_IF_NOT_NEEDED))
+$(eval $(call LINUX_AND_MINGW_GTEST_TARGETS, $(GTESTBINDIR)/m65fdisk.test, $(GTESTDIR)/m65fdisk_test.cpp $(UNIX_M65FDISK_SRC) Makefile, -fpermissive -std=gnu++11 -g -O0))
 
 # testing
 test: $(GTESTFILES)

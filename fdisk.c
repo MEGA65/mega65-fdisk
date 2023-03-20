@@ -35,6 +35,7 @@
 #ifdef __CC65__
 #include "ascii.h"
 #endif
+#include "dirtymock.h"
 
 #ifdef __CC65__
 #define xcopy(str, addr, len) lcopy((unsigned long)str, (unsigned long)addr, len);
@@ -49,6 +50,9 @@ unsigned char slot_magic[16] = { 0x4d, 0x45, 0x47, 0x41, 0x36, 0x35, 0x42, 0x49,
 unsigned char have_rom = 0, have_sdfiles = 0;
 uint8_t hardware_model_id = 0xff;
 unsigned long slot_size = 8L * 1048576L;
+
+void format_disk(void);
+void open_sdcard_and_retrieve_details(void);
 
 #ifdef __CC65__
 #define MAX_SLOT 8
@@ -668,7 +672,7 @@ char populate_file_system(unsigned char slot)
 #ifdef __CC65__
 void main(void)
 #else
-int main(int argc, char **argv)
+int DIRTYMOCK(main)(int argc, char **argv)
 #endif
 {
   unsigned char key, cardSlot, slotAvail;
@@ -764,68 +768,7 @@ next_card:
 #endif
 
   // Then make sure we have correct information for the selected card
-  sdcard_open();
-  sdcard_sectors = sdcard_getsize();
-  sdcard_readspeed_test();
-  show_mbr();
-
-  // Calculate sectors for the system and FAT32 partitions.
-  // This is the size of the card, minus 2,048 (=0x0800) sectors.
-  // The system partition should be sized to be not more than 50% of
-  // the SD card, and probably doesn't need to be bigger than 2GB, which would
-  // allow 1GB for 1,024 1MB freeze images and 1,024 1MB service images.
-  // (note that freeze images might end up being a funny size to allow for all
-  // mem plus a D81 image to be saved. This is all to be determined.)
-  // Simple solution for now: Use 1/2 disk for system partition, or 2GiB, whichever
-  // is smaller.
-  sys_partition_sectors = (sdcard_sectors - 0x0800) >> 1;
-  if (sys_partition_sectors > (2 * 1024UL * (1024UL * 1024UL / 512UL)))
-    sys_partition_sectors = (2 * 1024UL * (1024UL * 1024UL / 512UL));
-  sys_partition_sectors &= 0xfffff800; // round down to nearest 1MB boundary
-  fat_partition_sectors = sdcard_sectors - 0x800 - sys_partition_sectors;
-
-  fat_available_sectors = fat_partition_sectors - reserved_sectors;
-
-  fs_clusters = fat_available_sectors / (sectors_per_cluster);
-  fat_sectors = fs_clusters / (512 / 4);
-  if (fs_clusters % (512 / 4))
-    fat_sectors++;
-  sectors_required = 2 * fat_sectors + ((fs_clusters - 2) * sectors_per_cluster);
-  while (sectors_required > fat_available_sectors) {
-    uint32_t excess_sectors = sectors_required - fat_available_sectors;
-    uint32_t delta = (excess_sectors / (1 + sectors_per_cluster));
-    if (delta < 1)
-      delta = 1;
-#ifndef __CC65__
-    fprintf(
-        stderr, "%d clusters would take %d too many sectors.\r\n", fs_clusters, sectors_required - fat_available_sectors);
-#endif
-    fs_clusters -= delta;
-    fat_sectors = fs_clusters / (512 / 4);
-    if (fs_clusters % (512 / 4))
-      fat_sectors++;
-    sectors_required = 2 * fat_sectors + ((fs_clusters - 2) * sectors_per_cluster);
-  }
-#ifndef __CC65__
-  fprintf(stderr, "VFAT32 PARTITION HAS $%x SECTORS ($%x AVAILABLE)\r\n", fat_partition_sectors, fat_available_sectors);
-#else
-  // Tell use how many sectors available for partition
-  write_line("", 0);
-  write_line("$         Sectors available for MEGA65 System partition.", 1);
-  screen_hex(screen_line_address - 78, sys_partition_sectors);
-  build_mega65_sys_sector(sys_partition_sectors);
-
-  write_line("$         Sectors available for VFAT32 partition.", 1);
-  screen_hex(screen_line_address - 78, fat_partition_sectors);
-#endif
-
-  fat_partition_start = 0x00000800;
-  sys_partition_start = fat_partition_start + fat_partition_sectors;
-
-  fat1_sector = reserved_sectors;
-  fat2_sector = fat1_sector + fat_sectors;
-  rootdir_sector = fat2_sector + fat_sectors;
-  fs_data_sectors = fs_clusters * sectors_per_cluster;
+  open_sdcard_and_retrieve_details();
 
 #ifndef __CC65__
   printf("Type DELETE EVERYTHING to delete everything on %s SD.\n", cardSlot&1 ? "external" : "internal");
@@ -930,6 +873,79 @@ next_card:
   }
 #endif
 
+  format_disk();
+}
+
+void open_sdcard_and_retrieve_details(void)
+{
+  sdcard_open();
+  sdcard_sectors = sdcard_getsize();
+  sdcard_readspeed_test();
+  show_mbr();
+
+  // Calculate sectors for the system and FAT32 partitions.
+  // This is the size of the card, minus 2,048 (=0x0800) sectors.
+  // The system partition should be sized to be not more than 50% of
+  // the SD card, and probably doesn't need to be bigger than 2GB, which would
+  // allow 1GB for 1,024 1MB freeze images and 1,024 1MB service images.
+  // (note that freeze images might end up being a funny size to allow for all
+  // mem plus a D81 image to be saved. This is all to be determined.)
+  // Simple solution for now: Use 1/2 disk for system partition, or 2GiB, whichever
+  // is smaller.
+  sys_partition_sectors = (sdcard_sectors - 0x0800) >> 1;
+  if (sys_partition_sectors > (2 * 1024UL * (1024UL * 1024UL / 512UL)))
+    sys_partition_sectors = (2 * 1024UL * (1024UL * 1024UL / 512UL));
+  sys_partition_sectors &= 0xfffff800; // round down to nearest 1MB boundary
+  fat_partition_sectors = sdcard_sectors - 0x800 - sys_partition_sectors;
+
+  fat_available_sectors = fat_partition_sectors - reserved_sectors;
+
+  fs_clusters = fat_available_sectors / (sectors_per_cluster);
+  fat_sectors = fs_clusters / (512 / 4);
+  if (fs_clusters % (512 / 4))
+    fat_sectors++;
+  sectors_required = 2 * fat_sectors + ((fs_clusters - 2) * sectors_per_cluster);
+  while (sectors_required > fat_available_sectors) {
+    uint32_t excess_sectors = sectors_required - fat_available_sectors;
+    uint32_t delta = (excess_sectors / (1 + sectors_per_cluster));
+    if (delta < 1)
+      delta = 1;
+#ifndef __CC65__
+    fprintf(
+        stderr, "%d clusters would take %d too many sectors.\r\n", fs_clusters, sectors_required - fat_available_sectors);
+#endif
+    fs_clusters -= delta;
+    fat_sectors = fs_clusters / (512 / 4);
+    if (fs_clusters % (512 / 4))
+      fat_sectors++;
+    sectors_required = 2 * fat_sectors + ((fs_clusters - 2) * sectors_per_cluster);
+  }
+#ifndef __CC65__
+  fprintf(stderr, "VFAT32 PARTITION HAS $%x SECTORS ($%x AVAILABLE)\r\n", fat_partition_sectors, fat_available_sectors);
+#else
+  // Tell use how many sectors available for partition
+  write_line("", 0);
+  write_line("$         Sectors available for MEGA65 System partition.", 1);
+  screen_hex(screen_line_address - 78, sys_partition_sectors);
+  build_mega65_sys_sector(sys_partition_sectors);
+
+  write_line("$         Sectors available for VFAT32 partition.", 1);
+  screen_hex(screen_line_address - 78, fat_partition_sectors);
+#endif
+
+  fat_partition_start = 0x00000800;
+  sys_partition_start = fat_partition_start + fat_partition_sectors;
+
+  fat1_sector = reserved_sectors;
+  fat2_sector = fat1_sector + fat_sectors;
+  rootdir_sector = fat2_sector + fat_sectors;
+  fs_data_sectors = fs_clusters * sectors_per_cluster;
+}
+
+
+void format_disk(void)
+{
+  unsigned char key;
   // MBR is always the first sector of a disk
 #ifdef __CC65__
   write_line("", 0);
@@ -1057,7 +1073,11 @@ next_card:
       write_line("Populate SD card with embedded files from slot # or s to skip (#/s)?", 1);
       recolour_last_line(7);
       do {
+#ifdef TESTING
+        key = '0';
+#else
         key = mega65_getkey();
+#endif
         if (key == 's')
           break;
         for (i=0; i < MAX_SLOT; i++)

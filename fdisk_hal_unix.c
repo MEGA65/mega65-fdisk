@@ -111,6 +111,8 @@ void open_flash_file(void)
     exit(1);
   }
 
+  fprintf(stderr, "FLASHFILE=%s\n", getenv("FLASHFILE"));
+
   flash = fopen(getenv("FLASHFILE"),"rb+");
 }
 
