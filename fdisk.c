@@ -32,7 +32,9 @@
 #include "fdisk_memory.h"
 #include "fdisk_screen.h"
 #include "fdisk_fat32.h"
+#ifdef __CC65__
 #include "ascii.h"
+#endif
 
 unsigned char slot_magic[16] = { 0x4d, 0x45, 0x47, 0x41, 0x36, 0x35, 0x42, 0x49, 0x54, 0x53, 0x54, 0x52, 0x45, 0x41, 0x4d,
   0x30 };
@@ -343,10 +345,10 @@ void build_mega65_sys_sector(const uint32_t sys_partition_sectors)
     dividing space by (512KB + 128 bytes)*2= ~1025KB.
   */
   uint16_t i;
-  uint32_t slot_size = 512 * 1024 / 512; // slot_size units is sectors
+  uint32_t slot_size = 512UL * 1024UL / 512UL; // slot_size units is sectors
   // Take 1MB from partition size, for reserved space when
   // calculating what can fit.
-  uint32_t reserved_sectors = 1024 * 1024 / 512;
+  uint32_t reserved_sectors = 1024UL * 1024UL / 512UL;
   uint32_t slot_count = (sys_partition_sectors - reserved_sectors) / (slot_size * 2 + 1);
   uint16_t dir_size;
 
@@ -593,7 +595,7 @@ char populate_file_system(unsigned char slot)
         break;
     }
 
-    if (!strcmp(&sector_buffer[8], "MEGA65.ROM"))
+    if (!strcmp((char *)&sector_buffer[8], "MEGA65.ROM"))
       have_rom = 1;
 
     // Skip header
@@ -741,8 +743,8 @@ next_card:
   // Simple solution for now: Use 1/2 disk for system partition, or 2GiB, whichever
   // is smaller.
   sys_partition_sectors = (sdcard_sectors - 0x0800) >> 1;
-  if (sys_partition_sectors > (2 * 1024 * (1024 * 1024 / 512)))
-    sys_partition_sectors = (2 * 1024 * (1024 * 1024 / 512));
+  if (sys_partition_sectors > (2 * 1024UL * (1024UL * 1024UL / 512UL)))
+    sys_partition_sectors = (2 * 1024UL * (1024UL * 1024UL / 512UL));
   sys_partition_sectors &= 0xfffff800; // round down to nearest 1MB boundary
   fat_partition_sectors = sdcard_sectors - 0x800 - sys_partition_sectors;
 

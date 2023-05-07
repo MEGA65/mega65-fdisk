@@ -14,6 +14,8 @@ fdisk_screen.o
 fdisk_screen.s
 m65fdisk.map
 m65fdisk.prg
+m65fdisk.label
+m65fdisk.list
 pngprepare
 fdisk_fat32.c~
 fdisk_fat32.o

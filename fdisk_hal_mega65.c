@@ -86,7 +86,7 @@ void show_card_size(uint32_t sector_number)
   char col = 8;
   uint32_t megs = (sector_number + 1L) / 2048L;
   uint32_t gigs = 0;
-  if (megs & 0xffff0000L) {
+  if (megs & 0xffff0000UL) {
     gigs = megs / 1024L;
     megs = gigs;
   }
@@ -128,7 +128,7 @@ uint32_t sdcard_getsize(void)
   // (binary search of sector numbers is NOT safe for some reason.
   //  It frequently reports bigger than the size of the card)
   sector_number = 0;
-  step = 256 * 2048; // = 256MiB
+  step = 256UL * 2048UL; // = 256MiB
   while (sector_number < 0x10000000U) {
     //    write_line("Trying to read sector $",0);
     //    screen_hex(screen_line_address-80+24,sector_number);
