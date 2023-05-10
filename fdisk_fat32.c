@@ -12,6 +12,7 @@ extern uint32_t fat2_sector;
 extern uint32_t reserved_sectors;
 extern uint8_t sectors_per_cluster;
 extern uint32_t fat_sectors;
+extern uint32_t fat_partition_start;
 #define fat_copies 2
 #define sectors_per_fat fat_sectors
 #define root_dir_cluster 2
@@ -211,13 +212,12 @@ unsigned long fat32_allocate_cluster(unsigned long cluster)
 }
 
 #ifndef __CC65__
-extern uint32_t fat_partition_start;
 int are_there_gaps_between_files(void)
 {
   unsigned long fat_sector_num = 0;
   int found_unallocated_cluster = 0;
 
-  for (fat_sector_num = 0; fat_sector_num <= (fat2_sector - fat1_sector); fat_sector_num++) {
+  for (fat_sector_num = 0; fat_sector_num < (fat2_sector - fat1_sector); fat_sector_num++) {
     sdcard_readsector(fat_partition_start + fat1_sector + fat_sector_num);
     for (int j = 0; j < 512; j+=4) {
       int cval = sector_buffer[j] +
@@ -237,6 +237,85 @@ int are_there_gaps_between_files(void)
   return 0;
 }
 #endif
+
+unsigned long find_free_cluster(unsigned long first_cluster)
+{
+  unsigned long cluster = 0;
+
+  int retVal = 0;
+
+  do {
+    unsigned long i, o;
+
+    i = first_cluster / (512 / 4);
+    o = (first_cluster % (512 / 4)) * 4;
+
+    for (; i < sectors_per_fat; i++) {
+      // Read FAT sector
+      //      printf("Checking FAT sector $%x for free clusters.\n",i);
+      sdcard_readsector(fat_partition_start + fat1_sector + i);
+
+      // Search for free sectors
+      for (; o < 512; o += 4) {
+        if (!(sector_buffer[o] | sector_buffer[o + 1] | sector_buffer[o + 2] | sector_buffer[o + 3])) {
+          // Found a free cluster.
+          cluster = i * (512 / 4) + (o / 4);
+          // printf("cluster sector %d, offset %d yields cluster %d\n",i,o,cluster);
+          break;
+        }
+      }
+      o = 0;
+
+      if (cluster || retVal)
+        break;
+    }
+
+    // printf("I believe cluster $%x is free.\n",cluster);
+
+    retVal = cluster;
+  } while (0);
+
+  return retVal;
+}
+
+int is_free_cluster(unsigned int cluster)
+{
+  int i, o;
+  i = cluster / (512 / 4);
+  o = cluster % (512 / 4) * 4;
+
+  sdcard_readsector(fat_partition_start + fat1_sector + i);
+
+  if (!(sector_buffer[o] | sector_buffer[o + 1] | sector_buffer[o + 2] | sector_buffer[o + 3])) {
+    return 1;
+  }
+
+  return 0;
+}
+
+unsigned long find_contiguous_clusters(unsigned long total_clusters) {
+  unsigned long start_cluster = 0;
+
+  while (1) {
+    int is_contiguous = 1;
+    unsigned long cnt;
+    start_cluster = find_free_cluster(start_cluster);
+
+    for (cnt = 1; cnt < total_clusters; cnt++) {
+      if (!is_free_cluster(start_cluster + cnt)) {
+        is_contiguous = 0;
+        break;
+      }
+    }
+
+    if (is_contiguous)
+      break;
+
+    start_cluster += cnt;
+  }
+
+  return start_cluster;
+}
 
 /*
   Create a file in the root directory of the new FAT32 filesystem
@@ -350,43 +429,7 @@ long fat32_create_contiguous_file(char *name, long size, long root_dir_sector, l
     }
   }
 
-  // Find where we have enough contiguous space
-  //  mega65_serial_monitor_write("Search for free disk space\n");
-  contiguous_clusters = 0;
-  start_cluster = 0;
-  for (fat_sector_num = 0; fat_sector_num <= (fat2_sector - fat1_sector); fat_sector_num++) {
-
-    // This can take a while if the disk is full, because we use a naive search.
-    // So show the user that something is happening.
-    // XXX Use FAT32's hint of first cluster free _and_ then update it!
-    POKE(0xD020, PEEK(0xD020 + 1));
-
-    sdcard_readsector(fat1_sector + fat_sector_num);
-
-    // Skip any FAT sectors with allocated clusters
-    for (j = 0; j < 512; j++)
-      if (sector_buffer[j])
-        break;
-    if (j != 512) {
-      // Reset count of contiguous clusters
-      contiguous_clusters = 0;
-      continue;
-    }
-    else {
-      // Start from here
-      if (!contiguous_clusters)
-        start_cluster = fat_sector_num * 128;
-      contiguous_clusters += 128;
-    }
-    if (contiguous_clusters >= clusters)
-      break;
-  }
-
-  // Abort if the disk is full
-  if (contiguous_clusters < clusters) {
-    //    mega65_serial_monitor_write("Could not find free contiguous space\r\n");
-    return 0;
-  }
+  start_cluster = find_contiguous_clusters(clusters);
 
   //  mega65_serial_monitor_write("Found contiguous space beginning at cluster $");
   serial_hex(start_cluster);
@@ -398,18 +441,22 @@ long fat32_create_contiguous_file(char *name, long size, long root_dir_sector, l
   fat_sector_count = clusters / 128;
   if (clusters & 127)
     fat_sector_count++;
+  int start_offset = (start_cluster%128)*4;
+  int cluster_tally = 0;
   for (k = 0; k < fat_sector_count; k++) {
     // Fill FAT sector with chain
-    for (offset = 0; offset < 512; offset += 4) {
-      if (((k << 7) + (offset >> 2)) < clusters) {
+    for (offset = start_offset; offset < 512; offset += 4) {
+      if (cluster_tally < clusters) {
         // Write chain
-        *(unsigned long *)&sector_buffer[offset] = start_cluster + (k << 7) + (offset >> 2) + 1;
+        *(unsigned long *)&sector_buffer[offset] = (k << 7) + (offset >> 2) + 1;
       }
-      if (((k << 7) + (offset >> 2)) == (clusters - 1)) {
+      if (cluster_tally == (clusters - 1)) {
         // Mark end of chain
         *(unsigned long *)&sector_buffer[offset] = 0x0FFFFFF8;
       }
+      cluster_tally++;
     }
+    start_offset = 0;
     // Write FAT sector to both FATs
     sdcard_writesector(fat1_sector + fat_sector_num + k);
     sdcard_writesector(fat2_sector + fat_sector_num + k);
