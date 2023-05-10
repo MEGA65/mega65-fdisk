@@ -210,6 +210,34 @@ unsigned long fat32_allocate_cluster(unsigned long cluster)
   return 0;
 }
 
+#ifndef __CC65__
+extern uint32_t fat_partition_start;
+int are_there_gaps_between_files(void)
+{
+  unsigned long fat_sector_num = 0;
+  int found_unallocated_cluster = 0;
+
+  for (fat_sector_num = 0; fat_sector_num <= (fat2_sector - fat1_sector); fat_sector_num++) {
+    sdcard_readsector(fat_partition_start + fat1_sector + fat_sector_num);
+    for (int j = 0; j < 512; j+=4) {
+      int cval = sector_buffer[j] +
+        (sector_buffer[j+1] << 8) +
+        (sector_buffer[j+2] << 16) +
+        (sector_buffer[j+3] << 24);
+      if (!found_unallocated_cluster && cval == 0) {
+        found_unallocated_cluster = 1;
+        continue;
+      }
+
+      if (found_unallocated_cluster && cval != 0) {
+        return 1;
+      }
+    }
+  }
+  return 0;
+}
+#endif
+
 /*
   Create a file in the root directory of the new FAT32 filesystem
   with the indicated name and size.
