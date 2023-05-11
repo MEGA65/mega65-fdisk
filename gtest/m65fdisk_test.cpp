@@ -4,7 +4,7 @@
 #include <stdio.h>
 
 extern int real_main(int argc, char **argv);
-extern void format_disk(void);
+extern int format_disk(void);
 extern void open_sdcard_and_retrieve_details(void);
 extern int are_there_gaps_between_files(void);
 

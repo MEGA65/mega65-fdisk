@@ -51,7 +51,7 @@ unsigned char have_rom = 0, have_sdfiles = 0;
 uint8_t hardware_model_id = 0xff;
 unsigned long slot_size = 8L * 1048576L;
 
-void format_disk(void);
+int format_disk(void);
 void open_sdcard_and_retrieve_details(void);
 
 #ifdef __CC65__
@@ -681,9 +681,8 @@ rescanSlots:
 #ifdef __CC65__
   mega65_fast();
   setup_screen();
-
-next_card:
 #endif
+next_card:
 
   slotAvail = 0;
   sdcard_select(0);
@@ -873,7 +872,8 @@ next_card:
   }
 #endif
 
-  format_disk();
+  if (format_disk() == 1)
+    goto next_card;
 }
 
 void open_sdcard_and_retrieve_details(void)
@@ -943,7 +943,7 @@ void open_sdcard_and_retrieve_details(void)
 }
 
 
-void format_disk(void)
+int format_disk(void)
 {
   unsigned char key;
   // MBR is always the first sector of a disk
@@ -1164,8 +1164,9 @@ void format_disk(void)
       continue;
     POKE(0xD610, 0);
 
-    goto next_card;
+    return 1;
   }
+  return 0;
 
 #else
   return 0;

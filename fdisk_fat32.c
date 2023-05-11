@@ -338,6 +338,8 @@ long fat32_create_contiguous_file(char *name, long size, long root_dir_sector, l
   unsigned short offset = 0, j = 0;
   unsigned short clusters = 0;
   unsigned long k, start_cluster = 0;
+  unsigned long start_offset;
+  int cluster_tally;
   unsigned long dir_cluster = 2;
   unsigned long last_dir_cluster = 2;
   //  unsigned long next_cluster;
@@ -443,8 +445,8 @@ long fat32_create_contiguous_file(char *name, long size, long root_dir_sector, l
   fat_sector_count = clusters / 128;
   if (clusters & 127)
     fat_sector_count++;
-  int start_offset = (start_cluster%128)*4;
-  int cluster_tally = 0;
+  start_offset = (start_cluster%128)*4;
+  cluster_tally = 0;
   for (k = 0; k < fat_sector_count; k++) {
     // Fill FAT sector with chain
     for (offset = start_offset; offset < 512; offset += 4) {
