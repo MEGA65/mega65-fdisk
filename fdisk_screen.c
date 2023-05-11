@@ -1,6 +1,8 @@
 #include "fdisk_screen.h"
 #include "fdisk_memory.h"
+#ifdef __CC65__
 #include "ascii.h"
+#endif
 
 #ifndef __CC65__
 #include <stdio.h>

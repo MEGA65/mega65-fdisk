@@ -20,7 +20,7 @@ class M65FdiskTestFixture : public ::testing::Test {
       generate_empty_256mb_sdcard_img();
 
       setenv("SDCARDFILE", "sdcard.img", 1);
-      setenv("FLASHFILE", "mega65r3.cor", 1);
+      setenv("gtest/bin/FLASHFILE", "mega65r3.cor", 1);
     }
 
     void TearDown() override

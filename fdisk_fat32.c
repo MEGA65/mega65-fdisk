@@ -4,7 +4,9 @@
 #include "fdisk_hal.h"
 #include "fdisk_memory.h"
 #include "fdisk_screen.h"
+#ifdef __CC65__
 #include "ascii.h"
+#endif
 
 extern uint32_t root_dir_sector;
 extern uint32_t fat1_sector;
