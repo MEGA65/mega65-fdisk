@@ -139,7 +139,8 @@ clean:
 	*.o \
 	fdisk*.s \
 	ascii.h asciih \
-	ascii8x8.bin
+	ascii8x8.bin \
+	gtest/bin/m65fdisk.test
 
 cleangen:
 	rm ascii8x8.bin
