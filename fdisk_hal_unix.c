@@ -63,10 +63,10 @@ void sdcard_open(void)
   if (!getenv("SDCARDFILE")) {
     fprintf(stderr, "ERROR: Environment variable 'SDCARDFILE' not found!\n");
     fprintf(stderr, "- Please set it to either:\n"
-        "  - a file (e.g., 'sdcard.bin')\n"
-        "  - or your sd-card device (e.g., '/dev/sdb')\n"
-        "\n"
-        "- Also consider setting 'FLASHFILE' env-var to point to a .cor file\n");
+                    "  - a file (e.g., 'sdcard.bin')\n"
+                    "  - or your sd-card device (e.g., '/dev/sdb')\n"
+                    "\n"
+                    "- Also consider setting 'FLASHFILE' env-var to point to a .cor file\n");
 
     exit(1);
   }
@@ -113,7 +113,7 @@ void open_flash_file(void)
 
   fprintf(stderr, "FLASHFILE=%s\n", getenv("FLASHFILE"));
 
-  flash = fopen(getenv("FLASHFILE"),"rb+");
+  flash = fopen(getenv("FLASHFILE"), "rb+");
 }
 
 void flash_read512bytes(const uint32_t byte_offset)
@@ -132,10 +132,10 @@ unsigned char mega65_getkey(void)
   struct termios oldattr, newattr;
   int ch;
   tcgetattr(0, &oldattr);
-  newattr=oldattr;
-  newattr.c_lflag &= ~( ICANON | ECHO );
-  tcsetattr( 0, TCSANOW, &newattr);
-  ch=getchar();
+  newattr = oldattr;
+  newattr.c_lflag &= ~(ICANON | ECHO);
+  tcsetattr(0, TCSANOW, &newattr);
+  ch = getchar();
   tcsetattr(0, TCSANOW, &oldattr);
-  return(ch);
+  return (ch);
 }
