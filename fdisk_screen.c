@@ -52,7 +52,7 @@ void screen_hex(unsigned int addr, long value)
   POKE(addr + 7, to_screen_hex(value >> 0));
 }
 
-void format_hex(const int addr, const long value, const char columns)
+void format_hex(const unsigned int addr, const long value, const char columns)
 {
   char i, c;
   char dec[9];
@@ -97,7 +97,7 @@ void write_line(char *s, char col)
 #endif
 }
 
-void format_decimal(const int addr, const int value, const char columns)
+void format_decimal(const unsigned int addr, const int value, const char columns)
 {
 #ifdef __CC65__
   char i;

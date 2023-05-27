@@ -18,6 +18,8 @@ const uint16_t sd_errorcode = 0xd6daL;
 const char *prop_m65u_name = "PROP.M65U.NAME=SDCARD FDISK+FORMAT UTILITY";
 
 unsigned char key = 0;
+uint16_t i;
+
 unsigned char mega65_getkey(void)
 {
   while (!PEEK(0xD610))
@@ -428,8 +430,6 @@ void sdcard_writesector(const uint32_t sector_number)
   write_line("Write error @ $$$$$$$$$", 2);
   screen_hex(screen_line_address - 80 + 2 + 16, sector_number);
 }
-
-static uint16_t i;
 
 void sdcard_readspeed_test(void)
 {

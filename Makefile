@@ -140,6 +140,7 @@ clean:
 	fdisk*.s \
 	ascii.h asciih \
 	ascii8x8.bin \
+	*.prg \
 	gtest/bin/m65fdisk.test
 
 cleangen:
