@@ -1,6 +1,8 @@
 #include "fdisk_screen.h"
 #include "fdisk_memory.h"
+#ifdef __CC65__
 #include "ascii.h"
+#endif
 
 #ifndef __CC65__
 #include <stdio.h>
@@ -50,7 +52,7 @@ void screen_hex(unsigned int addr, long value)
   POKE(addr + 7, to_screen_hex(value >> 0));
 }
 
-void format_hex(const int addr, const long value, const char columns)
+void format_hex(const unsigned int addr, const long value, const char columns)
 {
   char i, c;
   char dec[9];
@@ -95,13 +97,30 @@ void write_line(char *s, char col)
 #endif
 }
 
+void format_decimal(const unsigned int addr, const int value, const char columns)
+{
 #ifdef __CC65__
+  char i;
+  char dec[6];
+  screen_decimal((int)&dec[0], value);
+
+  for (i = 0; i < columns; i++)
+    lpoke(addr + i, dec[i]);
+#else
+  printf("%08X", value);
+#endif
+}
+
 void recolour_last_line(char colour)
 {
+#ifdef __CC65__
   long colour_address = COLOUR_RAM_ADDRESS + (screen_line_address - SCREEN_ADDRESS) - 80;
   lfill(colour_address, colour, 80);
+#endif
   return;
 }
+
+#ifdef __CC65__
 
 unsigned char ii, j, carry, temp;
 unsigned int value;
@@ -150,16 +169,6 @@ void screen_decimal(unsigned int addr, unsigned int v)
   // Copy to screen
   for (j = 0; j < 5; j++)
     POKE(addr + j, screen_hex_buffer[j]);
-}
-
-void format_decimal(const int addr, const int value, const char columns)
-{
-  char i;
-  char dec[6];
-  screen_decimal((int)&dec[0], value);
-
-  for (i = 0; i < columns; i++)
-    lpoke(addr + i, dec[i]);
 }
 
 long addr;

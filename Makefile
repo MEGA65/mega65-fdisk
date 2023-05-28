@@ -14,6 +14,14 @@ LOPTS=	--asm-include-dir cc65/asminc --cfg-path cc65/cfg --lib-path cc65/lib
 
 FILES=		m65fdisk.prg  m65fdisk
 
+GTESTDIR=gtest
+GTESTBINDIR=$(GTESTDIR)/bin
+# For now, disable g++ compile warnings on tests (there's so many :))
+GTESTOPTS=-w -DTESTING
+
+GTESTFILES=$(GTESTBINDIR)/m65fdisk.test
+GTESTFILESEXE=$(GTESTBINDIR)/m65fdisk.test.exe
+
 M65IDESOURCES=	fdisk.c \
 		fdisk_memory.c \
 		fdisk_screen.c \
@@ -80,9 +88,50 @@ m65fdisk.prg:	$(ASSFILES) $(DATAFILES) $(CC65)
 	$(warning ======== Making: $@)
 	$(CL65) $(COPTS) $(LOPTS) -vm -m m65fdisk.map --listing m65fdisk.list -Ln m65fdisk.label -o m65fdisk.prg $(ASSFILES)
 
-m65fdisk:	$(HEADERS) Makefile fdisk.c fdisk_fat32.c fdisk_hal_unix.c fdisk_memory.c fdisk_screen.c
+UNIX_M65FDISK_SRC = fdisk.c \
+							 			fdisk_fat32.c \
+							 			fdisk_hal_unix.c \
+							 			fdisk_memory.c \
+							 			fdisk_screen.c
+
+m65fdisk:	$(HEADERS) Makefile $(UNIX_M65FDISK_SRC)
 	$(warning ======== Making: $@)
-	gcc -Wall -Wno-char-subscripts -o m65fdisk fdisk.c fdisk_fat32.c fdisk_hal_unix.c fdisk_memory.c fdisk_screen.c
+	gcc -Wall -Wno-char-subscripts -g -O0 -o m65fdisk $(UNIX_M65FDISK_SRC)
+
+define LINUX_AND_MINGW_GTEST_TARGETS
+$(1): $(2)
+	$$(CXX) $$(COPT) $$(GTESTOPTS) -Iinclude -o $$@ $$(filter %.c %.cpp,$$^) -lgtest_main -lgtest -lpthread $(3)
+
+$(1).exe: $(2)
+	$$(CXX) $$(WINCOPT) $$(GTESTOPTS) -Iinclude $(LIBUSBINC) -o $$@ $$(filter %.c %.cpp,$$^) -lgtest_main -lgtest -lpthread $(3)
+endef
+
+# Gives two targets of:
+# - gtest/bin/m65fdisk.test
+# - gtest/bin/m65fdisk.test.exe
+$(eval $(call LINUX_AND_MINGW_GTEST_TARGETS, $(GTESTBINDIR)/m65fdisk.test, $(GTESTDIR)/m65fdisk_test.cpp $(UNIX_M65FDISK_SRC) Makefile, -fpermissive -std=gnu++11 -g -O0))
+
+# testing
+test: $(GTESTFILES)
+	@for test in $+; do \
+		name=$${test%%.test}; \
+		name=$${name##*/}; \
+		echo ""; \
+		echo "TESTING: $$name..."; \
+		echo "======================"; \
+		$$test; \
+	done
+
+test.exe: $(GTESTFILESEXE)
+	@for test in $+; do \
+		name=$${test%%.test.exe}; \
+		name=$${name##*/}; \
+		path=$${test%/*}; \
+		echo ""; \
+		echo "TESTING: $$name..."; \
+		echo "======================"; \
+		cd $$path; ./$${test##*/}; \
+	done
 
 clean:
 	rm -f $(FILES) m65fdisk.map \
@@ -90,7 +139,9 @@ clean:
 	*.o \
 	fdisk*.s \
 	ascii.h asciih \
-	ascii8x8.bin
+	ascii8x8.bin \
+	*.prg \
+	gtest/bin/m65fdisk.test
 
 cleangen:
 	rm ascii8x8.bin

@@ -35,6 +35,14 @@
 #ifdef __CC65__
 #include "ascii.h"
 #endif
+#include "dirtymock.h"
+
+#ifdef __CC65__
+#define xcopy(str, addr, len) lcopy((unsigned long)str, (unsigned long)addr, len);
+#else
+#define xcopy(str, addr, len) bcopy(str, addr, len);
+#endif
+
 
 unsigned char slot_magic[16] = { 0x4d, 0x45, 0x47, 0x41, 0x36, 0x35, 0x42, 0x49, 0x54, 0x53, 0x54, 0x52, 0x45, 0x41, 0x4d,
   0x30 };
@@ -43,7 +51,15 @@ unsigned char have_rom = 0, have_sdfiles = 0;
 uint8_t hardware_model_id = 0xff;
 unsigned long slot_size = 8L * 1048576L;
 
+int format_disk(void);
+void open_sdcard_and_retrieve_details(void);
+
+#ifdef __CC65__
 #define MAX_SLOT 8
+#else
+#define MAX_SLOT 1
+#endif
+
 typedef struct {
   char version[32];
   unsigned char file_count;
@@ -193,7 +209,7 @@ void build_dosbootsector(uint32_t data_sectors, uint32_t fs_sectors_per_fat)
   clear_sector_buffer();
 
   // Start with template, and then modify relevant fields */
-  lcopy((unsigned long)boot_bytes, (unsigned long)sector_buffer, sizeof(boot_bytes));
+  xcopy(boot_bytes, sector_buffer, sizeof(boot_bytes));
 
   // 0x20-0x23 = 32-bit number of data sectors in file system
   for (i = 0; i < 4; i++)
@@ -523,19 +539,26 @@ char eightthree[8 + 3 + 1];
 void scan_slots(void)
 {
   unsigned char i, j;
+#ifdef __CC65__
 
   hardware_model_id = PEEK(0xD629);
   if (hardware_model_id == 3)
     slot_size = 1048576L * 8; // 8MB slots for mega65r3 platform
   else
     slot_size = 1048576L * 4;
+#else
+  // assume 8MB slot size for unix-based m65fdisk
+  slot_size = 1048576L * 8; // 8MB slots for mega65r3 platform
+#endif
 
   for (i = 0; i < MAX_SLOT; i++) {
     mega65slot[i].version[0] = 0;
     mega65slot[i].file_count = 0;
     mega65slot[i].file_offset = 0;
-    flash_readsector(i * slot_size);
+    flash_read512bytes(i * slot_size);
+#ifdef __CC65__
     lcopy(0xffd6e00, (unsigned long)sector_buffer, 512);
+#endif
     for (j = 0; j < 16; j++)
       if (slot_magic[j] != sector_buffer[j])
         break;
@@ -549,7 +572,11 @@ void scan_slots(void)
     mega65slot[i].version[j] = 0;
     for (j--; mega65slot[i].version[j] == ' ' && j > 0 ; j--);
     mega65slot[i].file_count = sector_buffer[0x72];
+#ifdef __CC65__
     mega65slot[i].file_offset = i * slot_size + *(unsigned long *)&sector_buffer[0x73];
+#else
+    mega65slot[i].file_offset = i * slot_size + *(unsigned int *)&sector_buffer[0x73];
+#endif
   }
 }
 
@@ -568,16 +595,29 @@ char populate_file_system(unsigned char slot)
   file_offset = mega65slot[slot].file_offset;
   file_count = mega65slot[slot].file_count;
   write_line("   Files in Core, starting at $        .", 1);
+#ifdef __CC65__
   format_decimal(screen_line_address - 79, file_count, 2);
   screen_hex(screen_line_address - 48, file_offset);
+#endif
 
   for (i = 0; i < file_count; i++) {
-    flash_readsector(file_offset);
+    flash_read512bytes(file_offset);
+#ifdef __CC65__
     next_offset = slot * slot_size + *(unsigned long *)&sector_buffer[0];
     file_len = *(unsigned long *)&sector_buffer[4];
+#else
+    next_offset = slot * slot_size + *(unsigned int *)&sector_buffer[0];
+    file_len = *(unsigned int *)&sector_buffer[4];
+#endif
     write_line("Pre-populating file ", 1);
     for (j = 0; sector_buffer[8 + j]; j++)
+#ifdef __CC65__
       lpoke(screen_line_address - 59 + j, sector_buffer[8 + j]);
+#else
+      printf("%c", sector_buffer[8+j]);
+
+    printf("\n");
+#endif
 #ifdef __CC65__
     recolour_last_line(8);
 #endif
@@ -609,7 +649,7 @@ char populate_file_system(unsigned char slot)
       unsigned long addr;
       for (addr = 0; addr <= file_len; addr += 512) {
         POKE(0xD020, PEEK(0xD020) + 1);
-        flash_readsector(file_offset + addr);
+        flash_read512bytes(file_offset + addr);
         sdcard_writesector(first_sector++);
       }
 #ifdef __CC65__
@@ -632,7 +672,7 @@ char populate_file_system(unsigned char slot)
 #ifdef __CC65__
 void main(void)
 #else
-int main(int argc, char **argv)
+int DIRTYMOCK(main)(int argc, char **argv)
 #endif
 {
   unsigned char key, cardSlot, slotAvail;
@@ -641,9 +681,8 @@ rescanSlots:
 #ifdef __CC65__
   mega65_fast();
   setup_screen();
-
-next_card:
 #endif
+next_card:
 
   slotAvail = 0;
   sdcard_select(0);
@@ -728,68 +767,7 @@ next_card:
 #endif
 
   // Then make sure we have correct information for the selected card
-  sdcard_open();
-  sdcard_sectors = sdcard_getsize();
-  sdcard_readspeed_test();
-  show_mbr();
-
-  // Calculate sectors for the system and FAT32 partitions.
-  // This is the size of the card, minus 2,048 (=0x0800) sectors.
-  // The system partition should be sized to be not more than 50% of
-  // the SD card, and probably doesn't need to be bigger than 2GB, which would
-  // allow 1GB for 1,024 1MB freeze images and 1,024 1MB service images.
-  // (note that freeze images might end up being a funny size to allow for all
-  // mem plus a D81 image to be saved. This is all to be determined.)
-  // Simple solution for now: Use 1/2 disk for system partition, or 2GiB, whichever
-  // is smaller.
-  sys_partition_sectors = (sdcard_sectors - 0x0800) >> 1;
-  if (sys_partition_sectors > (2 * 1024UL * (1024UL * 1024UL / 512UL)))
-    sys_partition_sectors = (2 * 1024UL * (1024UL * 1024UL / 512UL));
-  sys_partition_sectors &= 0xfffff800; // round down to nearest 1MB boundary
-  fat_partition_sectors = sdcard_sectors - 0x800 - sys_partition_sectors;
-
-  fat_available_sectors = fat_partition_sectors - reserved_sectors;
-
-  fs_clusters = fat_available_sectors / (sectors_per_cluster);
-  fat_sectors = fs_clusters / (512 / 4);
-  if (fs_clusters % (512 / 4))
-    fat_sectors++;
-  sectors_required = 2 * fat_sectors + ((fs_clusters - 2) * sectors_per_cluster);
-  while (sectors_required > fat_available_sectors) {
-    uint32_t excess_sectors = sectors_required - fat_available_sectors;
-    uint32_t delta = (excess_sectors / (1 + sectors_per_cluster));
-    if (delta < 1)
-      delta = 1;
-#ifndef __CC65__
-    fprintf(
-        stderr, "%d clusters would take %d too many sectors.\r\n", fs_clusters, sectors_required - fat_available_sectors);
-#endif
-    fs_clusters -= delta;
-    fat_sectors = fs_clusters / (512 / 4);
-    if (fs_clusters % (512 / 4))
-      fat_sectors++;
-    sectors_required = 2 * fat_sectors + ((fs_clusters - 2) * sectors_per_cluster);
-  }
-#ifndef __CC65__
-  fprintf(stderr, "VFAT32 PARTITION HAS $%x SECTORS ($%x AVAILABLE)\r\n", fat_partition_sectors, fat_available_sectors);
-#else
-  // Tell use how many sectors available for partition
-  write_line("", 0);
-  write_line("$         Sectors available for MEGA65 System partition.", 1);
-  screen_hex(screen_line_address - 78, sys_partition_sectors);
-  build_mega65_sys_sector(sys_partition_sectors);
-
-  write_line("$         Sectors available for VFAT32 partition.", 1);
-  screen_hex(screen_line_address - 78, fat_partition_sectors);
-#endif
-
-  fat_partition_start = 0x00000800;
-  sys_partition_start = fat_partition_start + fat_partition_sectors;
-
-  fat1_sector = reserved_sectors;
-  fat2_sector = fat1_sector + fat_sectors;
-  rootdir_sector = fat2_sector + fat_sectors;
-  fs_data_sectors = fs_clusters * sectors_per_cluster;
+  open_sdcard_and_retrieve_details();
 
 #ifndef __CC65__
   printf("Type DELETE EVERYTHING to delete everything on %s SD.\n", cardSlot&1 ? "external" : "internal");
@@ -894,6 +872,80 @@ next_card:
   }
 #endif
 
+  if (format_disk() == 1)
+    goto next_card;
+}
+
+void open_sdcard_and_retrieve_details(void)
+{
+  sdcard_open();
+  sdcard_sectors = sdcard_getsize();
+  sdcard_readspeed_test();
+  show_mbr();
+
+  // Calculate sectors for the system and FAT32 partitions.
+  // This is the size of the card, minus 2,048 (=0x0800) sectors.
+  // The system partition should be sized to be not more than 50% of
+  // the SD card, and probably doesn't need to be bigger than 2GB, which would
+  // allow 1GB for 1,024 1MB freeze images and 1,024 1MB service images.
+  // (note that freeze images might end up being a funny size to allow for all
+  // mem plus a D81 image to be saved. This is all to be determined.)
+  // Simple solution for now: Use 1/2 disk for system partition, or 2GiB, whichever
+  // is smaller.
+  sys_partition_sectors = (sdcard_sectors - 0x0800) >> 1;
+  if (sys_partition_sectors > (2 * 1024UL * (1024UL * 1024UL / 512UL)))
+    sys_partition_sectors = (2 * 1024UL * (1024UL * 1024UL / 512UL));
+  sys_partition_sectors &= 0xfffff800; // round down to nearest 1MB boundary
+  fat_partition_sectors = sdcard_sectors - 0x800 - sys_partition_sectors;
+
+  fat_available_sectors = fat_partition_sectors - reserved_sectors;
+
+  fs_clusters = fat_available_sectors / (sectors_per_cluster);
+  fat_sectors = fs_clusters / (512 / 4);
+  if (fs_clusters % (512 / 4))
+    fat_sectors++;
+  sectors_required = 2 * fat_sectors + ((fs_clusters - 2) * sectors_per_cluster);
+  while (sectors_required > fat_available_sectors) {
+    uint32_t excess_sectors = sectors_required - fat_available_sectors;
+    uint32_t delta = (excess_sectors / (1 + sectors_per_cluster));
+    if (delta < 1)
+      delta = 1;
+#ifndef __CC65__
+    fprintf(
+        stderr, "%d clusters would take %d too many sectors.\r\n", fs_clusters, sectors_required - fat_available_sectors);
+#endif
+    fs_clusters -= delta;
+    fat_sectors = fs_clusters / (512 / 4);
+    if (fs_clusters % (512 / 4))
+      fat_sectors++;
+    sectors_required = 2 * fat_sectors + ((fs_clusters - 2) * sectors_per_cluster);
+  }
+#ifndef __CC65__
+  fprintf(stderr, "VFAT32 PARTITION HAS $%x SECTORS ($%x AVAILABLE)\r\n", fat_partition_sectors, fat_available_sectors);
+#else
+  // Tell use how many sectors available for partition
+  write_line("", 0);
+  write_line("$         Sectors available for MEGA65 System partition.", 1);
+  screen_hex(screen_line_address - 78, sys_partition_sectors);
+  build_mega65_sys_sector(sys_partition_sectors);
+
+  write_line("$         Sectors available for VFAT32 partition.", 1);
+  screen_hex(screen_line_address - 78, fat_partition_sectors);
+#endif
+
+  fat_partition_start = 0x00000800;
+  sys_partition_start = fat_partition_start + fat_partition_sectors;
+
+  fat1_sector = reserved_sectors;
+  fat2_sector = fat1_sector + fat_sectors;
+  rootdir_sector = fat2_sector + fat_sectors;
+  fs_data_sectors = fs_clusters * sectors_per_cluster;
+}
+
+
+int format_disk(void)
+{
+  unsigned char key;
   // MBR is always the first sector of a disk
 #ifdef __CC65__
   write_line("", 0);
@@ -947,17 +999,13 @@ next_card:
     sdcard_erase(sys_partition_service_dir, sys_partition_service_dir + service_dir_sectors - 1);
   }
 
-#ifdef __CC65__
   write_line("Writing FAT Boot Sector...", 1);
-#endif
   // Partition starts at fixed position of sector 2048, i.e., 1MB
   build_dosbootsector(fat_partition_sectors, fat_sectors);
   sdcard_writesector(fat_partition_start);
   sdcard_writesector(fat_partition_start + 6); // Backup boot sector at partition + 6
 
-#ifdef __CC65__
   write_line("Writing FAT Information Block (and backup copy)...", 1);
-#endif
   // FAT32 FS Information block (and backup)
   build_fs_information_sector(fs_clusters);
   sdcard_writesector(fat_partition_start + 1);
@@ -996,7 +1044,6 @@ next_card:
   sdcard_erase(fat_partition_start + rootdir_sector + 1, fat_partition_start + rootdir_sector + 1 + sectors_per_cluster - 1);
 #endif
 
-#ifdef __CC65__
   /* Check if flash slot 0 contains embedded files that we should write to the SD card.
    */
   write_line("          ", 0);
@@ -1026,7 +1073,11 @@ next_card:
       write_line("Populate SD card with embedded files from slot # or s to skip (#/s)?", 1);
       recolour_last_line(7);
       do {
+#ifdef TESTING
+        key = '0';
+#else
         key = mega65_getkey();
+#endif
         if (key == 's')
           break;
         for (i=0; i < MAX_SLOT; i++)
@@ -1039,8 +1090,7 @@ next_card:
         write_line("Skipping SD card population.", 1);
     }
   }
-#else
-
+#ifdef SKIPFORNOW
   // Process loading and reading of files from disk image
   printf("Processing %d arguments.\n", argc);
   for (int i = 1; i < argc; i++) {
@@ -1114,8 +1164,9 @@ next_card:
       continue;
     POKE(0xD610, 0);
 
-    goto next_card;
+    return 1;
   }
+  return 0;
 
 #else
   return 0;

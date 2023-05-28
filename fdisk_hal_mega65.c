@@ -18,6 +18,8 @@ const uint16_t sd_errorcode = 0xd6daL;
 const char *prop_m65u_name = "PROP.M65U.NAME=SDCARD FDISK+FORMAT UTILITY";
 
 unsigned char key = 0;
+uint16_t i;
+
 unsigned char mega65_getkey(void)
 {
   while (!PEEK(0xD610))
@@ -265,9 +267,9 @@ void sdcard_readsector(const uint32_t sector_number)
   do_read_sector(0x02, sector_number);
 }
 
-void flash_readsector(const uint32_t sector_number)
+void flash_read512bytes(const uint32_t byte_offset)
 {
-  do_read_sector(0x53, sector_number);
+  do_read_sector(0x53, byte_offset);
 }
 
 uint8_t verify_buffer[512];
@@ -304,7 +306,7 @@ void sdcard_writesector(const uint32_t sector_number)
   // Copy the read data to a buffer for verification
   lcopy(sd_sectorbuffer, (long)verify_buffer, 512);
 
-  // VErify that it matches the data we wrote
+  // Verify that it matches the data we wrote
   for (i = 0; i < 512; i++) {
     if (sector_buffer[i] != verify_buffer[i])
       break;
@@ -428,8 +430,6 @@ void sdcard_writesector(const uint32_t sector_number)
   write_line("Write error @ $$$$$$$$$", 2);
   screen_hex(screen_line_address - 80 + 2 + 16, sector_number);
 }
-
-static uint16_t i;
 
 void sdcard_readspeed_test(void)
 {

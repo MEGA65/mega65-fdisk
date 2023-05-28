@@ -2,10 +2,12 @@
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <strings.h>
+#include <termios.h>
 
 #include "fdisk_hal.h"
 
 FILE *sdcard = NULL;
+FILE *flash = NULL;
 
 unsigned char sdcard_reset(void)
 {
@@ -58,9 +60,20 @@ uint32_t sdcard_getsize(void)
 
 void sdcard_open(void)
 {
-  sdcard = fopen("/dev/sdb", "r+");
+  if (!getenv("SDCARDFILE")) {
+    fprintf(stderr, "ERROR: Environment variable 'SDCARDFILE' not found!\n");
+    fprintf(stderr, "- Please set it to either:\n"
+                    "  - a file (e.g., 'sdcard.bin')\n"
+                    "  - or your sd-card device (e.g., '/dev/sdb')\n"
+                    "\n"
+                    "- Also consider setting 'FLASHFILE' env-var to point to a .cor file\n");
+
+    exit(1);
+  }
+
+  sdcard = fopen(getenv("SDCARDFILE"), "r+");
   if (!sdcard) {
-    fprintf(stderr, "Could not open sdcard.img.\n");
+    fprintf(stderr, "Could not open '%s'...\n", getenv("SDCARDFILE"));
     perror("fopen");
     exit(-1);
   }
@@ -87,4 +100,42 @@ void sdcard_erase(const uint32_t first_sector, const uint32_t last_sector)
 
   for (n = first_sector; n <= last_sector; n++)
     sdcard_writesector(n);
+}
+
+static int first_flash_read = 1;
+
+void open_flash_file(void)
+{
+  if (!getenv("FLASHFILE")) {
+    fprintf(stderr, "ERROR: Environment variable 'FLASHFILE' not found!\n");
+    exit(1);
+  }
+
+  fprintf(stderr, "FLASHFILE=%s\n", getenv("FLASHFILE"));
+
+  flash = fopen(getenv("FLASHFILE"), "rb+");
+}
+
+void flash_read512bytes(const uint32_t byte_offset)
+{
+  if (first_flash_read) {
+    first_flash_read = 0;
+    open_flash_file();
+  }
+
+  fseek(flash, byte_offset, SEEK_SET);
+  fread(sector_buffer, 512, 1, flash);
+}
+
+unsigned char mega65_getkey(void)
+{
+  struct termios oldattr, newattr;
+  int ch;
+  tcgetattr(0, &oldattr);
+  newattr = oldattr;
+  newattr.c_lflag &= ~(ICANON | ECHO);
+  tcsetattr(0, TCSANOW, &newattr);
+  ch = getchar();
+  tcsetattr(0, TCSANOW, &oldattr);
+  return (ch);
 }
