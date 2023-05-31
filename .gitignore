@@ -25,3 +25,4 @@ vivado_lab.log
 MEGA65.ROM
 sdcard.img
 m65fdisk
+gtest/bin/m65fdisk.test
