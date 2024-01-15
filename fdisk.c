@@ -307,7 +307,7 @@ uint32_t fat1_sector = 0;
 uint32_t fat2_sector = 0;
 uint32_t fs_data_sectors = 0;
 uint8_t sectors_per_cluster = 8; // 4KB clusters
-uint8_t volume_name[11] = "MEGA65FDISK";
+uint8_t volume_name[11] = {'M', 'E', 'G', 'A', '6', '5', 'F', 'D', 'I', 'S', 'K'};
 
 // Work out maximum number of clusters we can accommodate
 uint32_t sectors_required;
@@ -438,27 +438,32 @@ void build_mega65_sys_config_sector(void)
   sector_buffer[0x000] = 0x01;
   sector_buffer[0x001] = 0x01;
   // PAL=$00, NTSC=$80
-  sector_buffer[0x002] = 0x80;
-  // Enable audio amp, mono output
-  // XXX - Is mono output now controlled only via audio mixer?
-  sector_buffer[0x003] = 0x41;
+  sector_buffer[0x002] = 0x00;
+  // Default audio settings
+  sector_buffer[0x003] = 0x00;
   // Use SD card for floppies
   sector_buffer[0x004] = 0x00;
-  // Enable use of Amiga mouses automatically
-  sector_buffer[0x005] = 0x01;
-  // Pick an ethernet address 0x006 - 0x00b
-  // XXX - Should do a better job of this!
-  sector_buffer[0x006] = 0x41;
-  sector_buffer[0x007] = 0x41;
-  sector_buffer[0x008] = 0x41;
-  sector_buffer[0x009] = 0x41;
-  sector_buffer[0x00A] = 0x41;
-  sector_buffer[0x00B] = 0x41;
+  // Disable use of Amiga mouses by default
+  sector_buffer[0x005] = 0x00;
+  // Generate a random MAC address if no valid one is already present
+  sector_buffer[0x006] = (get_random_byte() & 0xfe) | 0x02;
+  sector_buffer[0x007] = get_random_byte();
+  sector_buffer[0x008] = get_random_byte();
+  sector_buffer[0x009] = get_random_byte();
+  sector_buffer[0x00A] = get_random_byte();
+  sector_buffer[0x00B] = get_random_byte();
+
+  // We keep the onboarding flag at offset 0x0e at 0x00, 
+  // so that hyppo will always boot onboarding on next boot-up
+
+  // Keep empty default disk image, this will default to auto-boot mega65.d81, anyway
+#if 0
   // Set name of default disk image
 #ifdef __CC65__
   lcopy((unsigned long)"mega65.d81", (unsigned long)&sector_buffer[0x10], 10);
 #else
   bcopy("mega65.d81", &sector_buffer[0x10], 10);
+#endif
 #endif
 
   // DMAgic to new version (F011B) by default
@@ -985,11 +990,11 @@ int format_disk(void)
 
     // Put a valid first config sector in place
     build_mega65_sys_config_sector();
-    sdcard_writesector(sys_partition_start + 1L);
+    sdcard_writesector(1);
 
     // Erase the rest of the 1MB reserved area
     write_line("Erasing configuration area", 1);
-    sdcard_erase(sys_partition_start + 2, sys_partition_start + 1023);
+    sdcard_erase(sys_partition_start + 1, sys_partition_start + 1023);
 
     // erase frozen program directory
     write_line("Erasing frozen program and system service directories", 1);
