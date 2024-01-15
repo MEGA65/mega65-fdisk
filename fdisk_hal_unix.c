@@ -3,11 +3,17 @@
 #include <sys/stat.h>
 #include <strings.h>
 #include <termios.h>
+#include <time.h>
 
 #include "fdisk_hal.h"
 
 FILE *sdcard = NULL;
 FILE *flash = NULL;
+
+unsigned char get_random_byte(void)
+{
+  return rand() % 256;
+}
 
 unsigned char sdcard_reset(void)
 {
@@ -60,6 +66,8 @@ uint32_t sdcard_getsize(void)
 
 void sdcard_open(void)
 {
+  srand(time(NULL));
+
   if (!getenv("SDCARDFILE")) {
     fprintf(stderr, "ERROR: Environment variable 'SDCARDFILE' not found!\n");
     fprintf(stderr, "- Please set it to either:\n"

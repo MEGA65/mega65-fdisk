@@ -9,8 +9,9 @@ else
 	CL65=cc65/bin/cl65
 endif
 
-COPTS=	-t c64 -O -Or -Oi -Os --cpu 65c02 -Icc65/include
-LOPTS=	--asm-include-dir cc65/asminc --cfg-path cc65/cfg --lib-path cc65/lib
+COPTS=		-t c64 -O -Or -Oi -Os --cpu 65c02 -Icc65/include
+LOPTS=		--asm-include-dir cc65/asminc --cfg-path cc65/cfg --lib-path cc65/lib
+PNGFLAGS=	`pkg-config --cflags --libs libpng`
 
 FILES=		m65fdisk.prg  m65fdisk
 
@@ -82,7 +83,7 @@ ascii.h:	asciih
 
 pngprepare:	pngprepare.c
 	$(warning ======== Making: $@)
-	$(CC) -I/usr/local/include -L/usr/local/lib -o pngprepare pngprepare.c -lpng
+	$(CC) $(PNGFLAGS) -o pngprepare pngprepare.c
 
 m65fdisk.prg:	$(ASSFILES) $(DATAFILES) $(CC65)
 	$(warning ======== Making: $@)

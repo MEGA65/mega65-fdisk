@@ -5,6 +5,7 @@
 extern uint8_t sector_buffer[512];
 extern unsigned char sdhc_card;
 
+unsigned char get_random_byte(void);
 uint32_t sdcard_getsize(void);
 void sdcard_open(void);
 void sdcard_writesector(const uint32_t sector_number);
