@@ -437,14 +437,14 @@ void build_mega65_sys_config_sector(void)
   // Structure version bytes
   sector_buffer[0x000] = 0x01;
   sector_buffer[0x001] = 0x01;
-  // PAL=$00, NTSC=$80
-  sector_buffer[0x002] = 0x00;
-  // Default audio settings
-  sector_buffer[0x003] = 0x00;
-  // Use SD card for floppies
-  sector_buffer[0x004] = 0x00;
-  // Disable use of Amiga mouses by default
-  sector_buffer[0x005] = 0x00;
+  
+  // As we keep the sector filled with zeros (excpect below values), 
+  // the following defaults will result:
+  // PAL video mode with audio, default audio settings, CRT emulation off, 
+  // SD card for floppies, 1351 mouse mode, force reset to onboarding,
+  // empty default disk image (results in MEGA65.D81 mounted as default disk 
+  // if present)
+
   // Generate a random MAC address if no valid one is already present
   sector_buffer[0x006] = (get_random_byte() & 0xfe) | 0x02;
   sector_buffer[0x007] = get_random_byte();
@@ -452,9 +452,6 @@ void build_mega65_sys_config_sector(void)
   sector_buffer[0x009] = get_random_byte();
   sector_buffer[0x00A] = get_random_byte();
   sector_buffer[0x00B] = get_random_byte();
-
-  // We keep the onboarding flag at offset 0x0e at 0x00, 
-  // so that hyppo will always boot onboarding on next boot-up
 
   // Keep empty default disk image, this will default to auto-boot mega65.d81, anyway
 #if 0
@@ -468,6 +465,9 @@ void build_mega65_sys_config_sector(void)
 
   // DMAgic to new version (F011B) by default
   sector_buffer[0x020] = 0x01;
+
+  // SID 8580 by default
+  sector_buffer[0x022] = 0x01;
 
   return;
 }
