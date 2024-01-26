@@ -49,7 +49,7 @@ unsigned char slot_magic[16] = { 0x4d, 0x45, 0x47, 0x41, 0x36, 0x35, 0x42, 0x49,
 
 unsigned char have_rom = 0, have_sdfiles = 0;
 uint8_t hardware_model_id = 0xff;
-unsigned long slot_size = 8L * 1048576L;
+unsigned long slot_size = 8UL * 0x100000UL;
 
 int format_disk(void);
 void open_sdcard_and_retrieve_details(void);
@@ -541,28 +541,52 @@ unsigned char file_count;
 unsigned long file_offset, next_offset, file_len, first_sector;
 char eightthree[8 + 3 + 1];
 
+typedef struct {
+  int model_id;
+  uint8_t slot_mb;
+} mega_models_t;
+
+// clang-format off
+mega_models_t mega_models[] = {
+  { 0x01, 8 },
+  { 0x02, 4 },
+  { 0x03, 8 },
+  { 0x04, 8 },
+  { 0x05, 8 },
+  { 0x06, 8 },
+  { 0x21, 4 },
+  { 0x22, 4 },
+  { 0x40, 4 },
+  { 0x41, 4 },
+  { 0x42, 4 },
+  { 0x60, 4},
+  { 0x61, 8},
+  { 0x62, 8},
+  { 0xFD, 4 },
+  { 0xFE, 8 },
+  { 0x00, 0 }
+};
+// clang-format on
+
 void scan_slots(void)
 {
-  unsigned char i, j;
-#ifdef __CC65__
+  unsigned char i, j, k;
 
+  // for non CC65 compile (why? for what?) we stick to the default 8MB defined at top
+#ifdef __CC65__
   hardware_model_id = PEEK(0xD629);
-  if (hardware_model_id == 3)
-    slot_size = 1048576L * 8; // 8MB slots for mega65r3 platform
-  else
-    slot_size = 1048576L * 4;
-#else
-  // assume 8MB slot size for unix-based m65fdisk
-  slot_size = 1048576L * 8; // 8MB slots for mega65r3 platform
+  for (i = 0; mega_models[i].model_id; i++)
+    if (hardware_model_id == mega_models[i].model_id)
+      slot_size = mega_models[i].slot_mb * 0x100000UL;
 #endif
 
   for (i = 0; i < MAX_SLOT; i++) {
     mega65slot[i].version[0] = 0;
     mega65slot[i].file_count = 0;
     mega65slot[i].file_offset = 0;
-    flash_read512bytes(i * slot_size);
+    flash_read512bytes(slot_size * (uint32_t)i);
 #ifdef __CC65__
-    lcopy(0xffd6e00, (unsigned long)sector_buffer, 512);
+    lcopy(0xffd6e00L, (long)sector_buffer, 512);
 #endif
     for (j = 0; j < 16; j++)
       if (slot_magic[j] != sector_buffer[j])
@@ -582,6 +606,21 @@ void scan_slots(void)
 #else
     mega65slot[i].file_offset = i * slot_size + *(unsigned int *)&sector_buffer[0x73];
 #endif
+    // detect duplicate slots and hide them
+    if (i > 1) {
+      for (j = 0; j < i; j++) {
+        if (!mega65slot[j].file_count)
+          continue;
+        if (mega65slot[i].file_count != mega65slot[j].file_count)
+          continue;
+        for (k = 0; k < 32 && mega65slot[i].version[k] == mega65slot[j].version[k]; k++);
+        if (k < 32)
+          continue;
+        mega65slot[i].file_count = 0;
+        mega65slot[i].file_offset = 0;
+        break;
+      }
+    }
   }
 }
 
@@ -680,7 +719,7 @@ void main(void)
 int DIRTYMOCK(main)(int argc, char **argv)
 #endif
 {
-  unsigned char key, cardSlot, slotAvail;
+  unsigned char key = '0', cardSlot = 0, slotAvail = 0;
 
 rescanSlots:
 #ifdef __CC65__
@@ -769,6 +808,9 @@ next_card:
 
   cardSlot = key & 1;
   sdcard_select(cardSlot);
+#else
+  if (key == 'r')
+    goto rescanSlots;
 #endif
 
   // Then make sure we have correct information for the selected card
@@ -1062,7 +1104,7 @@ int format_disk(void)
       if (!mega65slot[i].version[0] || !mega65slot[i].file_count) continue;
       strcpy(buffer, "(#) MEGA65 -    Files");
       buffer[1] = 0x30 + i;
-      format_decimal((int)buffer + 13, mega65slot[i].file_count, 2);
+      format_decimal((int)(buffer + 13), mega65slot[i].file_count, 2);
       write_line(buffer, 3);
       write_line(mega65slot[i].version, 7);
       if (mega65slot[i].file_count) {
@@ -1151,11 +1193,11 @@ int format_disk(void)
   write_line("SD Card has been formatted.", 1);
   recolour_last_line(0x37);
   if (!have_sdfiles)
-    write_line("Remove, Copy SD Essentials and MEGA65.ROM, reinsert AND reboot.", 1);
+    write_line("Remove, Copy SD Essentials and MEGA65.ROM, reinsert AND power cycle.", 1);
   else if (!have_rom)
-    write_line("Remove, Copy MEGA65.ROM, reinsert AND reboot.", 1);
+    write_line("Remove, Copy MEGA65.ROM, reinsert AND power cycle.", 1);
   else
-    write_line("Reboot to continue.", 1);
+    write_line("Power cycle to continue.", 1);
   recolour_last_line(0x37);
 
   if (!dont_confirm) {
