@@ -10,7 +10,7 @@ else
 endif
 
 COPTS=		-t c64 -O -Or -Oi -Os --cpu 65c02 -Icc65/include
-LOPTS=		--asm-include-dir cc65/asminc --cfg-path cc65/cfg --lib-path cc65/lib
+LOPTS=		--asm-include-dir cc65/asminc --config memory.cfg --lib-path cc65/lib
 PNGCFLAGS=`pkg-config --cflags libpng`
 PNGLIBS=	`pkg-config --libs libpng`
 
@@ -98,7 +98,7 @@ UNIX_M65FDISK_SRC = fdisk.c \
 
 m65fdisk:	$(HEADERS) Makefile $(UNIX_M65FDISK_SRC)
 	$(warning ======== Making: $@)
-	gcc -Wall -Wno-char-subscripts -g -O0 -o m65fdisk $(UNIX_M65FDISK_SRC)
+	gcc -Wall -Wno-pointer-to-int-cast -Wno-char-subscripts -g -O0 -o m65fdisk $(UNIX_M65FDISK_SRC)
 
 define LINUX_AND_MINGW_GTEST_TARGETS
 $(1): $(2)

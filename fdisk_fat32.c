@@ -343,7 +343,7 @@ long fat32_create_contiguous_file(char *name, long size, long root_dir_sector, l
   unsigned long dir_cluster = 2;
   unsigned long last_dir_cluster = 2;
   //  unsigned long next_cluster;
-  unsigned long contiguous_clusters = 0;
+  //  unsigned long contiguous_clusters = 0;
   unsigned long fat_sector_num = 0;
   unsigned long fat_sector_count = 0;
 
