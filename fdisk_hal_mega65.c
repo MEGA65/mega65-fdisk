@@ -20,6 +20,12 @@ const char *prop_m65u_name = "PROP.M65U.NAME=SDCARD FDISK+FORMAT UTILITY";
 unsigned char key = 0;
 uint16_t i;
 
+unsigned char get_random_byte(void)
+{
+  while (PEEK(0xD7FE) & 0x80) continue;
+  return PEEK(0xD7EF);
+}
+
 unsigned char mega65_getkey(void)
 {
   while (!PEEK(0xD610))

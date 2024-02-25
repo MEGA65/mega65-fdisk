@@ -19,7 +19,7 @@ char screen_column = 0;
 
 #ifdef __CC65__
 unsigned char *footer_messages[FOOTER_MAX + 1] = {
-  " MEGA65 FDISK+FORMAT V00.30 : (C) COPYRIGHT 2017-2024 PAUL GARDNER-STEPHEN ETC. ",
+  " MEGA65 FDISK V0.30       (C) 2017-2024 MEGA - MUSEUM OF ELECTRONIC GAMES & ART ",
   "                                                                                ",
   " A FATAL ERROR HAS OCCURRED, SORRY.                                             "
 };
@@ -258,6 +258,7 @@ void fatal_error(unsigned char *filename, unsigned int line_number)
 #else
 void fatal_error(unsigned char *filename, unsigned int line_number)
 {
+  fatal_i = 0;
   fprintf(stderr, "%s:%d: Fatal error encountered.\n", filename, line_number);
   exit(-1);
 }
