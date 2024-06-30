@@ -1102,10 +1102,14 @@ int format_disk(void)
     slotActive = 0;
     for (i = 0; i < MAX_SLOT; i++) {
       if (!mega65slot[i].version[0] || !mega65slot[i].file_count) continue;
+#ifdef __CC65__
       strcpy(buffer, "(#) MEGA65 -    Files");
       buffer[1] = 0x30 + i;
       format_decimal((int)(buffer + 13), mega65slot[i].file_count, 2);
       write_line(buffer, 3);
+#else
+      fprintf(stdout, "(%d) MEGA65 - %2d Files\n", i, mega65slot[i].file_count);
+#endif
       write_line(mega65slot[i].version, 7);
       if (mega65slot[i].file_count) {
         slotCount++;
