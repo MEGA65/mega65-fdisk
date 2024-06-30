@@ -122,6 +122,11 @@ void open_flash_file(void)
   fprintf(stderr, "FLASHFILE=%s\n", getenv("FLASHFILE"));
 
   flash = fopen(getenv("FLASHFILE"), "rb+");
+  if (!flash) {
+    fprintf(stderr, "Could not open '%s'...\n", getenv("FLASHFILE"));
+    perror("fopen");
+    exit(-1);
+  }
 }
 
 void flash_read512bytes(const uint32_t byte_offset)
