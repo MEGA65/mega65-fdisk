@@ -5,6 +5,7 @@ FDISK+Format Utility for MEGA65 (http://github.com/MEGA65)
 * need something for ```pngprepare```, -> ```sudo apt install libpng12-dev```
 * the 'cc65' toolchain is required, and by default this is taken care of in the Makefile.  
 Alternatively, you can supply your pre-built ```cc65``` binaries (see below at "CI").
+* there must be a checked out and build copy of ```mega65-libc``` on the same level as mega65-fdisk
 
 ## Building
 * ``make`` will build (including init/update/build of submodule ``./cc65``)

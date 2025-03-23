@@ -28,8 +28,8 @@
 #include <sys/stat.h>
 #endif
 
+#include <memory.h>
 #include "fdisk_hal.h"
-#include "fdisk_memory.h"
 #include "fdisk_screen.h"
 #include "fdisk_fat32.h"
 #ifdef __CC65__

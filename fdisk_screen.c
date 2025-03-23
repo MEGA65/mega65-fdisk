@@ -1,7 +1,7 @@
 #include "fdisk_screen.h"
-#include "fdisk_memory.h"
 #ifdef __CC65__
 #include "ascii.h"
+#include <memory.h>
 #endif
 
 #ifndef __CC65__
@@ -189,7 +189,7 @@ void setup_screen(void)
 {
   unsigned char v;
 
-  m65_io_enable();
+  mega65_io_enable();
 
   // 80-column mode, fast CPU, extended attributes enable
   *((unsigned char *)0xD031) = 0xe0;

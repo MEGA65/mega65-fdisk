@@ -9,12 +9,23 @@ else
 	CL65=cc65/bin/cl65
 endif
 
-COPTS=		-t c64 -O -Or -Oi -Os --cpu 65c02 -Icc65/include
-LOPTS=		--asm-include-dir cc65/asminc --config memory.cfg --lib-path cc65/lib
+# check if we are building against the old version of libc, still having cc65 as a toplevel dir
+ifneq ($(wildcard ../mega65-libc/cc65/*),)
+	MEGA65LIBCDIR=	../mega65-libc/cc65
+	MEGA65LIBCLIB=	$(MEGA65LIBCDIR)/libmega65.a
+	MEGA65LIBCINC=	-I$(MEGA65LIBCDIR)/include
+else
+	MEGA65LIBCDIR= ../mega65-libc
+	MEGA65LIBCLIB= $(MEGA65LIBCDIR)/libmega65.a
+	MEGA65LIBCINC= -I$(MEGA65LIBCDIR)/include/mega65
+endif
+
+COPTS=		-t c64 -O -Or -Oi -Os --cpu 65c02 -Icc65/include $(MEGA65LIBCINC)
+LOPTS=		--asm-include-dir cc65/asminc --config memory.cfg --lib-path cc65/lib -L$(MEGA65LIBCDIR)
 PNGCFLAGS=`pkg-config --cflags libpng`
 PNGLIBS=	`pkg-config --libs libpng`
 
-FILES=		m65fdisk.prg  m65fdisk
+FILES=		m65fdisk.prg
 
 GTESTDIR=gtest
 GTESTBINDIR=$(GTESTDIR)/bin
@@ -25,20 +36,17 @@ GTESTFILES=$(GTESTBINDIR)/m65fdisk.test
 GTESTFILESEXE=$(GTESTBINDIR)/m65fdisk.test.exe
 
 M65IDESOURCES=	fdisk.c \
-		fdisk_memory.c \
 		fdisk_screen.c \
 		fdisk_fat32.c \
 		fdisk_hal_mega65.c
 
 ASSFILES=	fdisk.s \
-		fdisk_memory.s \
 		fdisk_screen.s \
 		fdisk_fat32.s \
 		fdisk_hal_mega65.s \
 		charset.s
 
 HEADERS=	Makefile \
-		fdisk_memory.h \
 		fdisk_screen.h \
 		fdisk_fat32.h \
 		fdisk_hal.h \
@@ -88,13 +96,12 @@ pngprepare:	pngprepare.c
 
 m65fdisk.prg:	$(ASSFILES) $(DATAFILES) $(CC65)
 	$(warning ======== Making: $@)
-	$(CL65) $(COPTS) $(LOPTS) -vm -m m65fdisk.map --listing m65fdisk.list -Ln m65fdisk.label -o m65fdisk.prg $(ASSFILES)
+	$(CL65) $(COPTS) $(LOPTS) -vm -m m65fdisk.map --listing m65fdisk.list -Ln m65fdisk.label -o m65fdisk.prg $(ASSFILES) $(MEGA65LIBCLIB)
 
 UNIX_M65FDISK_SRC = fdisk.c \
-							 			fdisk_fat32.c \
-							 			fdisk_hal_unix.c \
-							 			fdisk_memory.c \
-							 			fdisk_screen.c
+			fdisk_fat32.c \
+			fdisk_hal_unix.c \
+			fdisk_screen.c
 
 m65fdisk:	$(HEADERS) Makefile $(UNIX_M65FDISK_SRC)
 	$(warning ======== Making: $@)

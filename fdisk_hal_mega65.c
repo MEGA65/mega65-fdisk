@@ -1,13 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <memory.h>
+
 #include "fdisk_hal.h"
-#include "fdisk_memory.h"
 #include "fdisk_screen.h"
 #include "ascii.h"
-
-#define POKE(X, Y) (*(unsigned char *)(X)) = Y
-#define PEEK(X) (*(unsigned char *)(X))
 
 const long sd_sectorbuffer = 0xffd6e00L;
 const uint16_t sd_ctl = 0xd680L;
@@ -185,15 +183,11 @@ uint32_t write_count = 0;
 
 void sdcard_map_sector_buffer(void)
 {
-  m65_io_enable();
-
   POKE(sd_ctl, 0x81);
 }
 
 void sdcard_unmap_sector_buffer(void)
 {
-  m65_io_enable();
-
   POKE(sd_ctl, 0x82);
 }
 

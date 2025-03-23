@@ -2,9 +2,9 @@
 #include <string.h>
 
 #include "fdisk_hal.h"
-#include "fdisk_memory.h"
 #include "fdisk_screen.h"
 #ifdef __CC65__
+#include <memory.h>
 #include "ascii.h"
 #endif
 
@@ -95,22 +95,6 @@ struct m65_tm {
   int tm_yday;            /* Day in the year (0-365, 1 Jan = 0) */
   unsigned char tm_isdst; /* Daylight saving time */
 };
-
-unsigned char db1, db2, db3;
-
-#ifdef __CC65__
-unsigned char lpeek_debounced(long address)
-{
-  db1 = 0;
-  db2 = 1;
-  while (db1 != db2 || db1 != db3) {
-    db1 = lpeek(address);
-    db2 = lpeek(address);
-    db3 = lpeek(address);
-  }
-  return db1;
-}
-#endif
 
 unsigned char bcd_work;
 
