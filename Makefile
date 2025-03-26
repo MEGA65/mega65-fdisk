@@ -63,7 +63,7 @@ format:
 $(CL65):
 $(CC65):
 	$(warning ======== Making: $@)
-ifdef $(USE_LOCAL_CC65)
+ifdef USE_LOCAL_CC65
 	@echo "Using local installed CC65."
 else
 	git submodule init
