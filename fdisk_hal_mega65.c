@@ -269,6 +269,9 @@ void sdcard_readsector(const uint32_t sector_number)
 
 void flash_read512bytes(const uint32_t byte_offset)
 {
+  // Hard-coding latency cycle thing to suit MEGA65R3 QSPI
+  POKE(sd_ctl, 0x5f);
+
   do_read_sector(0x53, byte_offset);
 }
 
