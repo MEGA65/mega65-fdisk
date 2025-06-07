@@ -362,10 +362,19 @@ void build_mega65_sys_sector(const uint32_t sys_partition_sectors)
   */
   uint16_t i;
   uint32_t slot_size = 512UL * 1024UL / 512UL; // slot_size units is sectors
+
+  // Default to half of system partition for SHARED RESOURCE area
+  // (This is used for stashing Unicode fonts etc on the MEGAphone).
+  // XXX - We should make all these allocation decisions (including the size of
+  // the system partition) user-selectable.
+  uint32_t shared_resource_sectors = sys_partition_sectors >> 1;
+  
   // Take 1MB from partition size, for reserved space when
   // calculating what can fit.
-  uint32_t reserved_sectors = 1024UL * 1024UL / 512UL;
-  uint32_t slot_count = (sys_partition_sectors - reserved_sectors) / (slot_size * 2 + 1);
+  uint32_t reserved_sectors = (1024UL * 1024UL / 512UL);
+
+  uint32_t used_sectors = shared_resource_sectors + reserved_sectors;
+  uint32_t slot_count = (sys_partition_sectors - used_sectors) / (slot_size * 2 + 1);
   uint16_t dir_size;
 
   // Limit number of freeze slots to 16 bit counters
@@ -417,7 +426,11 @@ void build_mega65_sys_sector(const uint32_t sys_partition_sectors)
   sector_buffer_write_uint16(0x2c, slot_count);
   // $02e-$02f = Number of sectors in service slot directory
   sector_buffer_write_uint16(0x2e, dir_size);
-
+  // $030-$033 = First sector within the SYSPART for the shared resource area
+  sector_buffer_write_uint32(0x30, reserved_sectors);
+  // $034-$037 = Number of sectors for shared resources
+  sector_buffer_write_uint32(0x34, shared_resource_sectors);  
+  
   // Now make sector numbers relative to start of disk for later use
   sys_partition_freeze_dir += sys_partition_start;
   sys_partition_service_dir += sys_partition_start;
@@ -940,8 +953,8 @@ void open_sdcard_and_retrieve_details(void)
   // Simple solution for now: Use 1/2 disk for system partition, or 2GiB, whichever
   // is smaller.
   sys_partition_sectors = (sdcard_sectors - 0x0800) >> 1;
-  if (sys_partition_sectors > (2 * 1024UL * (1024UL * 1024UL / 512UL)))
-    sys_partition_sectors = (2 * 1024UL * (1024UL * 1024UL / 512UL));
+  if (sys_partition_sectors > (4 * 1024UL * (1024UL * 1024UL / 512UL)))
+    sys_partition_sectors = (4 * 1024UL * (1024UL * 1024UL / 512UL));
   sys_partition_sectors &= 0xfffff800; // round down to nearest 1MB boundary
   fat_partition_sectors = sdcard_sectors - 0x800 - sys_partition_sectors;
 
