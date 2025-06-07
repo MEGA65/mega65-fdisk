@@ -19,7 +19,7 @@ char screen_column = 0;
 
 #ifdef __CC65__
 unsigned char *footer_messages[FOOTER_MAX + 1] = {
-  " MEGA65 FDISK V0.35       (C) 2017-2024 MEGA - MUSEUM OF ELECTRONIC GAMES & ART ",
+  " MEGA65 FDISK V0.36       (C) 2017-2025 MEGA - MUSEUM OF ELECTRONIC GAMES & ART ",
   "                                                                                ",
   " A FATAL ERROR HAS OCCURRED, SORRY.                                             "
 };
