@@ -369,19 +369,22 @@ void build_mega65_sys_sector(const uint32_t sys_partition_sectors)
   // the system partition) user-selectable.
   uint32_t shared_resource_sectors = sys_partition_sectors >> 1;
   
-  // Take 1MB from partition size, for reserved space when
-  // calculating what can fit.
+  // From the lower half of sys_partition_sectors (which is shared_resource_sectors)
+  // we take 1MB, for reserved space when calculating what can fit.
   uint32_t reserved_sectors = (1024UL * 1024UL / 512UL);
 
-  uint32_t used_sectors = shared_resource_sectors + reserved_sectors;
-  uint32_t slot_count = (sys_partition_sectors - used_sectors) / (slot_size * 2 + 1);
+  // to calculate slot_count we need to divide lower half of sys_partition_sectors
+  // (same as shared_resource_sectors) minus reserved_sectors by the slot_sizes for
+  // freeze and service slots plus space for the dir sectors.
+  uint32_t slot_count = (shared_resource_sectors - reserved_sectors) / (slot_size * 2 + 1);
   uint16_t dir_size;
 
   // Limit number of freeze slots to 16 bit counters
   if (slot_count >= 0xffff)
     slot_count = 0xffff;
 
-  dir_size = 1 + (slot_count / 4);
+  // dir_size is the same for bot freeze and service slots!
+  dir_size = (slot_count >> 2) + 1;
 
   freeze_dir_sectors = dir_size;
   service_dir_sectors = dir_size;
@@ -389,7 +392,7 @@ void build_mega65_sys_sector(const uint32_t sys_partition_sectors)
   // Freeze directory begins at 1MB
   sys_partition_freeze_dir = reserved_sectors;
   // System service directory begins after that
-  sys_partition_service_dir = sys_partition_freeze_dir + slot_size * slot_count;
+  sys_partition_service_dir = sys_partition_freeze_dir + slot_size * slot_count + dir_size;
 
 #ifdef __CC65__
   write_line("      Freeze and OS Service slots.", 0);
@@ -416,7 +419,7 @@ void build_mega65_sys_sector(const uint32_t sys_partition_sectors)
   // $01e-$01f = Number of sectors in freeze slot directory
   sector_buffer_write_uint16(0x1e, dir_size);
 
-  // $020-$023 = Start of freeze program area
+  // $020-$023 = Start of service program area
   sector_buffer_write_uint32(0x20, slot_size * slot_count + dir_size);
   // $024-$027 = Size of service program area
   sector_buffer_write_uint32(0x24, slot_size * slot_count + dir_size);
@@ -427,10 +430,10 @@ void build_mega65_sys_sector(const uint32_t sys_partition_sectors)
   // $02e-$02f = Number of sectors in service slot directory
   sector_buffer_write_uint16(0x2e, dir_size);
   // $030-$033 = First sector within the SYSPART for the shared resource area
-  sector_buffer_write_uint32(0x30, reserved_sectors);
+  sector_buffer_write_uint32(0x30, shared_resource_sectors);
   // $034-$037 = Number of sectors for shared resources
-  sector_buffer_write_uint32(0x34, shared_resource_sectors);  
-  
+  sector_buffer_write_uint32(0x34, shared_resource_sectors);
+
   // Now make sector numbers relative to start of disk for later use
   sys_partition_freeze_dir += sys_partition_start;
   sys_partition_service_dir += sys_partition_start;
@@ -953,8 +956,8 @@ void open_sdcard_and_retrieve_details(void)
   // Simple solution for now: Use 1/2 disk for system partition, or 2GiB, whichever
   // is smaller.
   sys_partition_sectors = (sdcard_sectors - 0x0800) >> 1;
-  if (sys_partition_sectors > (4 * 1024UL * (1024UL * 1024UL / 512UL)))
-    sys_partition_sectors = (4 * 1024UL * (1024UL * 1024UL / 512UL));
+  if (sys_partition_sectors > (2 * 1024UL * (1024UL * 1024UL / 512UL)))
+    sys_partition_sectors = (2 * 1024UL * (1024UL * 1024UL / 512UL));
   sys_partition_sectors &= 0xfffff800; // round down to nearest 1MB boundary
   fat_partition_sectors = sdcard_sectors - 0x800 - sys_partition_sectors;
 
