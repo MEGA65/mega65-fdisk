@@ -8,6 +8,7 @@
 #include "ascii.h"
 
 const long sd_sectorbuffer = 0xffd6e00L;
+const long qspi_sectorbuffer = 0xffd6a00L;
 const uint16_t sd_ctl = 0xd680L;
 const uint16_t sd_addr = 0xd681L;
 const uint16_t sd_errorcode = 0xd6daL;
@@ -269,11 +270,21 @@ void sdcard_readsector(const uint32_t sector_number)
 
 void flash_read512bytes(const uint32_t byte_offset)
 {
-  // Hard-coding latency cycles to fix flash reads
-  // TODO: use common library for flash and sdcard
-  POKE(sd_ctl, 0x5f);
+  uint32_t sector_address = byte_offset;
 
-  do_read_sector(0x53, byte_offset);
+  POKE(sd_addr + 0, (sector_address >> 0) & 0xff);
+  POKE(sd_addr + 1, (sector_address >> 8) & 0xff);
+  POKE(sd_addr + 2, ((uint32_t)sector_address >> 16) & 0xff);
+  POKE(sd_addr + 3, ((uint32_t)sector_address >> 24) & 0xff);
+
+  while (PEEK(sd_ctl) & 0x01)
+    continue;
+  POKE(sd_ctl, 0x61);
+
+  while (PEEK(sd_ctl) & 0x01)
+    continue;
+
+  lcopy(qspi_sectorbuffer, (long)sector_buffer, 512);
 }
 
 uint8_t verify_buffer[512];
