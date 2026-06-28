@@ -368,7 +368,7 @@ void build_mega65_sys_sector(const uint32_t sys_partition_sectors)
   // XXX - We should make all these allocation decisions (including the size of
   // the system partition) user-selectable.
   uint32_t shared_resource_sectors = sys_partition_sectors >> 1;
-  
+
   // From the lower half of sys_partition_sectors (which is shared_resource_sectors)
   // we take 1MB, for reserved space when calculating what can fit.
   uint32_t reserved_sectors = (1024UL * 1024UL / 512UL);
@@ -601,9 +601,6 @@ void scan_slots(void)
     mega65slot[i].file_count = 0;
     mega65slot[i].file_offset = 0;
     flash_read512bytes(slot_size * (uint32_t)i);
-#ifdef __CC65__
-    lcopy(0xffd6e00L, (long)sector_buffer, 512);
-#endif
     for (j = 0; j < 16; j++)
       if (slot_magic[j] != sector_buffer[j])
         break;
