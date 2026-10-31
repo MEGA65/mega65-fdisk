@@ -289,13 +289,34 @@ void flash_read512bytes(const uint32_t byte_offset)
 
 uint8_t verify_buffer[512];
 
+// Wait for the SD controller to be ready, for several seconds: a slow card
+// can be busy for over 0.2 s after a write, and a reset before it is done
+// can leave it busy for seconds more at its next init.  1 if still busy.
+unsigned char sd_wait_ready(void)
+{
+  uint32_t n = 0x400000UL;
+  while (PEEK(sd_ctl) & 3) {
+    if (!--n)
+      return 1;
+  }
+  return 0;
+}
+
+// Reset the card, then wait for its init to finish before using it
+void sd_reset_and_wait(void)
+{
+  POKE(sd_ctl, 0); // begin reset
+  usleep(500000);
+  POKE(sd_ctl, 1); // end reset
+  sd_wait_ready();
+}
+
 void sdcard_writesector(const uint32_t sector_number)
 {
   // Copy buffer into the SD card buffer, and then execute the write job
   uint32_t sector_address;
   int i;
   char tries = 0, result;
-  uint16_t counter = 0;
 
   while (PEEK(sd_ctl) & 3) {
     continue;
@@ -336,24 +357,8 @@ void sdcard_writesector(const uint32_t sector_number)
     lcopy((long)sector_buffer, sd_sectorbuffer, 512);
 
     // Wait for SD card to be ready
-    counter = 0;
-    while (PEEK(sd_ctl) & 3) {
-      counter++;
-      if (!counter) {
-
-        // SD card not becoming ready: try reset
-        POKE(sd_ctl, 0); // begin reset
-        usleep(500000);
-        POKE(sd_ctl, 1); // end reset
-        if (sector_number)
-          POKE(sd_ctl, 0x57); // open SD card write gate
-        else
-          POKE(sd_ctl, 0x4D); // open SD card write gate for MBR
-        POKE(sd_ctl, 3);      // retry write
-      }
-      // Show we are doing something
-      //	POKE(0x804f,1+(PEEK(0x804f)&0x7f));
-    }
+    if (sd_wait_ready())
+      sd_reset_and_wait();
 
     // Command write
     if (sector_number)
@@ -366,23 +371,14 @@ void sdcard_writesector(const uint32_t sector_number)
       continue;
 
     // Wait for write to complete
-    counter = 0;
-    while (PEEK(sd_ctl) & 3) {
-      counter++;
-      if (!counter) {
-
-        // SD card not becoming ready: try reset
-        POKE(sd_ctl, 0); // begin reset
-        usleep(500000);
-        POKE(sd_ctl, 1); // end reset
-        if (sector_number)
-          POKE(sd_ctl, 0x57); // open SD card write gate
-        else
-          POKE(sd_ctl, 0x4D); // open SD card write gate for MBR
-        POKE(sd_ctl, 3);      // retry write
-      }
-      // Show we are doing something
-      //	POKE(0x809f,1+(PEEK(0x809f)&0x7f));
+    while (sd_wait_ready()) {
+      // SD card not becoming ready: try reset
+      sd_reset_and_wait();
+      if (sector_number)
+        POKE(sd_ctl, 0x57); // open SD card write gate
+      else
+        POKE(sd_ctl, 0x4D); // open SD card write gate for MBR
+      POKE(sd_ctl, 3);      // retry write
     }
 
     write_count++;
