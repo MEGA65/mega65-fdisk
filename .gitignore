@@ -26,3 +26,6 @@ MEGA65.ROM
 sdcard.img
 m65fdisk
 gtest/bin/m65fdisk.test
+fdisk_hal_mega65-sdlog.s
+m65fdisk-sdlog.prg
+m65fdisk-sdlog.map

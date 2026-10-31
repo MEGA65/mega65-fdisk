@@ -98,6 +98,22 @@ m65fdisk.prg:	$(ASSFILES) $(DATAFILES) $(CC65)
 	$(warning ======== Making: $@)
 	$(CL65) $(COPTS) $(LOPTS) -vm -m m65fdisk.map --listing m65fdisk.list -Ln m65fdisk.label -o m65fdisk.prg $(ASSFILES) $(MEGA65LIBCLIB)
 
+# Instrumented: logs every SD controller access to attic RAM (see SDLOG in
+# fdisk_hal_mega65.c, and sdlog_dump.py to read it back)
+SDLOGASSFILES=	fdisk.s \
+		fdisk_screen.s \
+		fdisk_fat32.s \
+		fdisk_hal_mega65-sdlog.s \
+		charset.s
+
+fdisk_hal_mega65-sdlog.s:	fdisk_hal_mega65.c $(HEADERS) $(DATAFILES) $(CC65)
+	$(warning ======== Making: $@)
+	$(CC65) $(COPTS) -DSDLOG --add-source -o $@ $<
+
+m65fdisk-sdlog.prg:	$(SDLOGASSFILES) $(DATAFILES) $(CC65)
+	$(warning ======== Making: $@)
+	$(CL65) $(COPTS) $(LOPTS) -vm -m m65fdisk-sdlog.map -o m65fdisk-sdlog.prg $(SDLOGASSFILES) $(MEGA65LIBCLIB)
+
 UNIX_M65FDISK_SRC = fdisk.c \
 			fdisk_fat32.c \
 			fdisk_hal_unix.c \

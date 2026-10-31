@@ -13,6 +13,163 @@ const uint16_t sd_ctl = 0xd680L;
 const uint16_t sd_addr = 0xd681L;
 const uint16_t sd_errorcode = 0xd6daL;
 
+#ifdef SDLOG
+// Instrumented build (make m65fdisk-sdlog.prg): every write to $D680 and
+// every change of the value read from it goes into a log in attic RAM, with
+// a microsecond time, so that what FDISK did to a card before it stopped
+// answering can be read back over the serial monitor (sdlog_dump.py).
+//
+// $8000000: "SDLG", entries written (32 bits), entry size (16), ring size
+// in entries; $8000010-: the entries, a ring of SDLOG_RING.  An entry:
+//   0 type: 'W' $D680 written (1: the value), 'S' $D680 read changed (1:
+//     the new value), 'I' the init record ($D6CE 16-23, in 4-11), 'B' the
+//     block record ($D6CE 32-55, three entries: 1 = 0, 1, 2; 4-11 its bytes)
+//   2 $D686  3 $D687  4-7 $D681-$D684 (W and S)
+//   8-11 time, CIA 2 timers A and B chained (phi2, about 1 MHz) (W and S)
+//   12-15 the reads of $D680 since the previous entry
+// After an init (the first idle status after a $01) the init record is
+// logged; when the error bit (6) sets, the block record.  The card is
+// called wedged when an init ends in the SPI fallback (record flags bit 0)
+// or with $D687 = $03: the log stops there and the screen says so.
+#include <memory.h>
+#define SDLOG_BASE 0x8000000L
+#define SDLOG_RING 0x40000UL
+static uint32_t sdlog_n = 0;
+static uint32_t sdlog_polls = 0;
+static unsigned char sdlog_last = 0xff;
+static unsigned char sdlog_on = 0;
+static unsigned char sdlog_initing = 0;
+static unsigned char sdlog_reset = 0;
+static unsigned char sdlog_stopped = 0;
+static unsigned char sdlog_e[16];
+static unsigned char sdlog_rec[24];
+static const unsigned char sdlog_head[16] = {
+  'S', 'D', 'L', 'G', 0, 0, 0, 0, 16, 0, 0, 0,
+  (SDLOG_RING >> 0) & 0xff, (SDLOG_RING >> 8) & 0xff, (SDLOG_RING >> 16) & 0xff, 0
+};
+
+static void sdlog_start(void)
+{
+  // CIA 2: timer A free-running from phi2, timer B counting its underflows
+  POKE(0xdd0d, 0x7f);
+  POKE(0xdd0e, 0x00);
+  POKE(0xdd0f, 0x00);
+  POKE(0xdd04, 0xff);
+  POKE(0xdd05, 0xff);
+  POKE(0xdd06, 0xff);
+  POKE(0xdd07, 0xff);
+  POKE(0xdd0f, 0x51);
+  POKE(0xdd0e, 0x11);
+  lcopy((long)sdlog_head, SDLOG_BASE, 16);
+  sdlog_on = 1;
+}
+
+static void sdlog_put(void)
+{
+  lcopy((long)sdlog_e, SDLOG_BASE + 16 + (long)((sdlog_n & (SDLOG_RING - 1)) << 4), 16);
+  sdlog_n++;
+  lcopy((long)&sdlog_n, SDLOG_BASE + 4, 4);
+  sdlog_polls = 0;
+}
+
+static void sdlog_event(unsigned char type, unsigned char value)
+{
+  if (!sdlog_on)
+    sdlog_start();
+  if (sdlog_stopped)
+    return;
+  sdlog_e[0] = type;
+  sdlog_e[1] = value;
+  sdlog_e[2] = PEEK(0xd686);
+  sdlog_e[3] = PEEK(0xd687);
+  sdlog_e[4] = PEEK(0xd681);
+  sdlog_e[5] = PEEK(0xd682);
+  sdlog_e[6] = PEEK(0xd683);
+  sdlog_e[7] = PEEK(0xd684);
+  // (B high first: a wrap of A between the reads is off by 65 ms, rarely)
+  sdlog_e[11] = ~PEEK(0xdd07);
+  sdlog_e[10] = ~PEEK(0xdd06);
+  sdlog_e[9] = ~PEEK(0xdd05);
+  sdlog_e[8] = ~PEEK(0xdd04);
+  *(uint32_t *)&sdlog_e[12] = sdlog_polls;
+  sdlog_put();
+}
+
+static void sdlog_record(unsigned char type, unsigned char first, unsigned char count)
+{
+  unsigned char i;
+  POKE(0xd6ce, 0x80);
+  for (i = 0; i < count; i++) {
+    POKE(0xd6ce, first + i);
+    sdlog_rec[i] = PEEK(0xd6cf);
+  }
+  for (i = 0; i < count; i += 8) {
+    sdlog_e[0] = type;
+    sdlog_e[1] = i >> 3;
+    sdlog_e[2] = PEEK(0xd686);
+    sdlog_e[3] = PEEK(0xd687);
+    lcopy((long)&sdlog_rec[i], (long)&sdlog_e[4], 8);
+    *(uint32_t *)&sdlog_e[12] = sdlog_polls;
+    sdlog_put();
+  }
+}
+
+static unsigned char sdlog_native(void)
+{
+  return PEEK(0xd6cc) == 0x53 && PEEK(0xd6cd) == 0x01;
+}
+
+void sdlog_wedged(void)
+{
+  sdlog_stopped = 1;
+  write_line("SDLOG: WEDGED, LOG STOPPED. ENTRIES:", 2);
+  screen_hex(screen_line_address - 80 + 36, sdlog_n);
+  mega65_getkey();
+}
+
+unsigned char sd_peek(void)
+{
+  unsigned char v = PEEK(0xd680);
+  sdlog_polls++;
+  if (v != sdlog_last && !sdlog_stopped) {
+    sdlog_event('S', v);
+    if ((v & 0x40) && !(sdlog_last & 0x40) && sdlog_native())
+      sdlog_record('B', 32, 24);
+    sdlog_last = v;
+    if ((v & 0x40) && PEEK(0xd687) == 0x03 && sdlog_native())
+      sdlog_wedged();
+    else if (sdlog_initing && !(v & 0x03)) {
+      sdlog_initing = 0;
+      if (sdlog_native()) {
+        sdlog_record('I', 16, 8);
+        if ((sdlog_rec[2] & 0x01) || PEEK(0xd687) == 0x03)
+          sdlog_wedged();
+      }
+    }
+  }
+  return v;
+}
+
+void sd_poke(unsigned char v)
+{
+  POKE(0xd680, v);
+  sdlog_event('W', v);
+  // (an init: $01 ends a reset; FDISK writes $01 alone before each write)
+  if (v == 0x00 || v == 0x10)
+    sdlog_reset = 1;
+  else if ((v == 0x01 || v == 0x11) && sdlog_reset) {
+    sdlog_reset = 0;
+    sdlog_initing = 1;
+  }
+}
+
+#define SD_PEEK() sd_peek()
+#define SD_POKE(V) sd_poke(V)
+#else
+#define SD_PEEK() PEEK(sd_ctl)
+#define SD_POKE(V) POKE(sd_ctl, V)
+#endif
+
 // Tell utilpacker what our display name is
 const char *prop_m65u_name = "PROP.M65U.NAME=SDCARD FDISK+FORMAT UTILITY";
 
@@ -36,7 +193,7 @@ unsigned char mega65_getkey(void)
 
 void sdcard_select(unsigned char n)
 {
-  POKE(sd_ctl, 0xc0 + (n & 1));
+  SD_POKE(0xc0 + (n & 1));
 }
 
 void usleep(uint32_t micros)
@@ -61,15 +218,15 @@ unsigned char sdcard_reset(void)
   //  write_line("Resetting SD card...",0);
 
   // Clear SDHC flag
-  POKE(sd_ctl, 0x40);
+  SD_POKE(0x40);
 
-  POKE(sd_ctl, 0);
-  POKE(sd_ctl, 1);
+  SD_POKE(0);
+  SD_POKE(1);
 
   reset_timeout = 100000L;
 
   // Now wait for SD card reset to complete
-  while (PEEK(sd_ctl) & 3) {
+  while (SD_PEEK() & 3) {
     POKE(0xd020, (PEEK(0xd020) + 1) & 15);
     reset_timeout--;
     if (!reset_timeout)
@@ -77,7 +234,7 @@ unsigned char sdcard_reset(void)
   }
 
   // Set SDHC flag, since we don't support SDC cards any more
-  POKE(sd_ctl, 0x41);
+  SD_POKE(0x41);
 
   return 0;
 }
@@ -140,7 +297,7 @@ uint32_t sdcard_getsize(void)
     //    write_line("Trying to read sector $",0);
     //    screen_hex(screen_line_address-80+24,sector_number);
     sdcard_readsector(sector_number);
-    result = PEEK(sd_ctl) & 0x63;
+    result = SD_PEEK() & 0x63;
     if (result) {
       //      write_line("Read failed",2);
       // Failed to read this, so reduce step size, and then resume.
@@ -184,12 +341,12 @@ uint32_t write_count = 0;
 
 void sdcard_map_sector_buffer(void)
 {
-  POKE(sd_ctl, 0x81);
+  SD_POKE(0x81);
 }
 
 void sdcard_unmap_sector_buffer(void)
 {
-  POKE(sd_ctl, 0x82);
+  SD_POKE(0x82);
 }
 
 unsigned short timeout;
@@ -211,42 +368,42 @@ void do_read_sector(unsigned char cmd, uint32_t sector_number)
 
     // Wait for SD card to be ready
     timeout = 50000U;
-    while (PEEK(sd_ctl) & 0x3) {
+    while (SD_PEEK() & 0x3) {
       timeout--;
       if (!timeout)
         return;
-      if (PEEK(sd_ctl) & 0x40) {
+      if (SD_PEEK() & 0x40) {
         return;
       }
       // Sometimes we see this result, i.e., sdcard.vhdl thinks it is done,
       // but sdcardio.vhdl thinks not. This means a read error
-      if (PEEK(sd_ctl) == 0x01)
+      if (SD_PEEK() == 0x01)
         return;
     }
 
     // Command read
-    POKE(sd_ctl, cmd);
+    SD_POKE(cmd);
 
     // Wait for read to complete
     timeout = 50000U;
-    while (PEEK(sd_ctl) & 0x3) {
+    while (SD_PEEK() & 0x3) {
       timeout--;
       if (!timeout)
         return;
       //      write_line("Waiting for read to complete",0);
-      if (PEEK(sd_ctl) & 0x40) {
+      if (SD_PEEK() & 0x40) {
         return;
       }
       // Sometimes we see this result, i.e., sdcard.vhdl thinks it is done,
       // but sdcardio.vhdl thinks not. This means a read error
-      if (PEEK(sd_ctl) == 0x01)
+      if (SD_PEEK() == 0x01)
         return;
     }
 
     // Note result
-    // result=PEEK(sd_ctl);
+    // result=SD_PEEK();
 
-    if (!(PEEK(sd_ctl) & 0x67)) {
+    if (!(SD_PEEK() & 0x67)) {
       // Copy data from hardware sector buffer via DMA
       lcopy(sd_sectorbuffer, (long)sector_buffer, 512);
 
@@ -277,11 +434,11 @@ void flash_read512bytes(const uint32_t byte_offset)
   POKE(sd_addr + 2, ((uint32_t)sector_address >> 16) & 0xff);
   POKE(sd_addr + 3, ((uint32_t)sector_address >> 24) & 0xff);
 
-  while (PEEK(sd_ctl) & 0x01)
+  while (SD_PEEK() & 0x01)
     continue;
-  POKE(sd_ctl, 0x61);
+  SD_POKE(0x61);
 
-  while (PEEK(sd_ctl) & 0x01)
+  while (SD_PEEK() & 0x01)
     continue;
 
   lcopy(qspi_sectorbuffer, (long)sector_buffer, 512);
@@ -295,20 +452,28 @@ uint8_t verify_buffer[512];
 unsigned char sd_wait_ready(void)
 {
   uint32_t n = 0x400000UL;
-  while (PEEK(sd_ctl) & 3) {
+  while (SD_PEEK() & 3) {
     if (!--n)
       return 1;
   }
   return 0;
 }
 
-// Reset the card, then wait for its init to finish before using it
+// Reset the card, then wait for its init to finish before using it.  A
+// native SD controller ($D6CC/$D6CD = $53 $01) reports a card that is in
+// but answers nothing with $D687 = $03: only re-inserting it helps
 void sd_reset_and_wait(void)
 {
-  POKE(sd_ctl, 0); // begin reset
-  usleep(500000);
-  POKE(sd_ctl, 1); // end reset
-  sd_wait_ready();
+  while (1) {
+    SD_POKE(0); // begin reset
+    usleep(500000);
+    SD_POKE(1); // end reset
+    sd_wait_ready();
+    if (PEEK(0xd6cc) != 0x53 || PEEK(0xd6cd) != 0x01 || PEEK(0xd687) != 0x03)
+      return;
+    write_line("SD CARD STOPPED RESPONDING. REINSERT IT, THEN PRESS A KEY.", 2);
+    mega65_getkey();
+  }
 }
 
 void sdcard_writesector(const uint32_t sector_number)
@@ -318,12 +483,12 @@ void sdcard_writesector(const uint32_t sector_number)
   int i;
   char tries = 0, result;
 
-  while (PEEK(sd_ctl) & 3) {
+  while (SD_PEEK() & 3) {
     continue;
   }
 
   // Set address to read/write
-  POKE(sd_ctl, 1); // end reset
+  SD_POKE(1); // end reset
   sector_address = sector_number;
   POKE(sd_addr + 0, (sector_address >> 0) & 0xff);
   POKE(sd_addr + 1, (sector_address >> 8) & 0xff);
@@ -333,9 +498,9 @@ void sdcard_writesector(const uint32_t sector_number)
   // Read the sector and see if it already has the correct contents.
   // If so, nothing to write
 
-  POKE(sd_ctl, 2); // read the sector we just wrote
+  SD_POKE(2); // read the sector we just wrote
 
-  while (PEEK(sd_ctl) & 3) {
+  while (SD_PEEK() & 3) {
     continue;
   }
 
@@ -362,12 +527,12 @@ void sdcard_writesector(const uint32_t sector_number)
 
     // Command write
     if (sector_number)
-      POKE(sd_ctl, 0x57); // open SD card write gate
+      SD_POKE(0x57); // open SD card write gate
     else
-      POKE(sd_ctl, 0x4D); // open SD card write gate for MBR
-    POKE(sd_ctl, 3);
+      SD_POKE(0x4D); // open SD card write gate for MBR
+    SD_POKE(3);
 
-    while (!(PEEK(sd_ctl) & 3))
+    while (!(SD_PEEK() & 3))
       continue;
 
     // Wait for write to complete
@@ -375,19 +540,19 @@ void sdcard_writesector(const uint32_t sector_number)
       // SD card not becoming ready: try reset
       sd_reset_and_wait();
       if (sector_number)
-        POKE(sd_ctl, 0x57); // open SD card write gate
+        SD_POKE(0x57); // open SD card write gate
       else
-        POKE(sd_ctl, 0x4D); // open SD card write gate for MBR
-      POKE(sd_ctl, 3);      // retry write
+        SD_POKE(0x4D); // open SD card write gate for MBR
+      SD_POKE(3);      // retry write
     }
 
     write_count++;
     POKE(0xD020, write_count & 0x0f);
 
     // Note result
-    result = PEEK(sd_ctl);
+    result = SD_PEEK();
 
-    if (!(PEEK(sd_ctl) & 0x67)) {
+    if (!(SD_PEEK() & 0x67)) {
       write_count++;
 
       POKE(0xD020, write_count & 0x0f);
@@ -399,17 +564,17 @@ void sdcard_writesector(const uint32_t sector_number)
 
       // Does it just need some time between accesses?
 
-      while (PEEK(sd_ctl) & 3) {
+      while (SD_PEEK() & 3) {
         continue;
       }
 
-      POKE(sd_ctl, 2); // read the sector we just wrote
+      SD_POKE(2); // read the sector we just wrote
 
-      while (!(PEEK(sd_ctl) & 3)) {
+      while (!(SD_PEEK() & 3)) {
         continue;
       }
 
-      while (PEEK(sd_ctl) & 3) {
+      while (SD_PEEK() & 3) {
         continue;
       }
 
@@ -442,6 +607,12 @@ void sdcard_writesector(const uint32_t sector_number)
   screen_hex(screen_line_address - 80 + 2 + 16, sector_number);
 }
 
+#ifdef SDLOG
+// (no room for it in the instrumented build)
+void sdcard_readspeed_test(void)
+{
+}
+#else
 void sdcard_readspeed_test(void)
 {
   uint32_t n;
@@ -458,12 +629,12 @@ void sdcard_readspeed_test(void)
     n += 9873;
     n &= 0xfffff;
 
-    while (PEEK(sd_ctl) & 3)
+    while (SD_PEEK() & 3)
       continue;
-    POKE(sd_ctl, 0x02);
-    while (!(PEEK(sd_ctl) & 3))
+    SD_POKE(0x02);
+    while (!(SD_PEEK() & 3))
       continue;
-    while (PEEK(sd_ctl) & 3) {
+    while (SD_PEEK() & 3) {
       if (PEEK(0xD012U) != last_raster) {
         total_time++;
         last_raster = PEEK(0xD012U);
@@ -491,6 +662,7 @@ void sdcard_readspeed_test(void)
   write_line("SD Card read speed =       KB/sec", 2);
   screen_decimal(screen_line_address - 80 + 23, speed);
 }
+#endif
 
 #if 0
 void multisector_write_test(void)
@@ -528,42 +700,42 @@ void multisector_write_test(void)
   for(n=first_sector;n<=last_sector;n++) {
 
     // Wait for SD card to go ready
-    while (PEEK(sd_ctl)&3) continue;
+    while (SD_PEEK()&3) continue;
     
     if (sector_number)
-      POKE(sd_ctl,0x57); // open SD card write gate
+      SD_POKE(0x57); // open SD card write gate
     else
-      POKE(sd_ctl,0x4D); // open SD card write gate for MBR
+      SD_POKE(0x4D); // open SD card write gate for MBR
     if (n==first_sector) {
       // First sector of multi-sector write
-      POKE(sd_ctl,0x04);
+      SD_POKE(0x04);
     } else {
       // Subsequent sector of multi-sector write
-      POKE(sd_ctl,0x05);
+      SD_POKE(0x05);
     }
 
-    // while (!(PEEK(sd_ctl)&3)) continue;
+    // while (!(SD_PEEK()&3)) continue;
     POKE(0xD020U,1);
     
-    while (PEEK(sd_ctl)&3) continue;
+    while (SD_PEEK()&3) continue;
     POKE(0xD020U,0);
   }
 
   // End multi-sector write
   if (sector_number)
-    POKE(sd_ctl,0x57); // open SD card write gate
+    SD_POKE(0x57); // open SD card write gate
   else
-    POKE(sd_ctl,0x4D); // open SD card write gate for MBR
-  POKE(sd_ctl,0x06);
+    SD_POKE(0x4D); // open SD card write gate for MBR
+  SD_POKE(0x06);
 
   // Wait for SD card to go busy
-  while (!(PEEK(sd_ctl)&3)) continue;
+  while (!(SD_PEEK()&3)) continue;
   
   // Wait for SD card to go ready
-  while (PEEK(sd_ctl)&3) continue;
+  while (SD_PEEK()&3) continue;
   
   // Try to flush cache?
-  //  POKE(sd_ctl,0x0c);
+  //  SD_POKE(0x0c);
   
   // Read sectors and see what is there already
   verify_errors=0;
@@ -591,7 +763,7 @@ void multisector_write_test(void)
   for(n=first_sector;n<=last_sector;n++) {
 
     // Wait for SD card to go ready
-    while (PEEK(sd_ctl)&3) continue;
+    while (SD_PEEK()&3) continue;
 
     // Record sector number in start of each sector
     sector_buffer[0]=n>>0;
@@ -602,36 +774,36 @@ void multisector_write_test(void)
     POKE(SCREEN_ADDRESS+10*80+n-first_sector,lpeek(sd_sectorbuffer));
     
     if (sector_number)
-      POKE(sd_ctl,0x57); // open SD card write gate
+      SD_POKE(0x57); // open SD card write gate
     else
-      POKE(sd_ctl,0x4D); // open SD card write gate for MBR
+      SD_POKE(0x4D); // open SD card write gate for MBR
     if (n==first_sector) {
       // First sector of multi-sector write
-      POKE(sd_ctl,0x04);
+      SD_POKE(0x04);
     } else {
       // Subsequent sector of multi-sector write
-      POKE(sd_ctl,0x05);
+      SD_POKE(0x05);
     }
 
-    // while (!(PEEK(sd_ctl)&3)) continue;
+    // while (!(SD_PEEK()&3)) continue;
     POKE(0xD020U,1);
     
-    while (PEEK(sd_ctl)&3) continue;
+    while (SD_PEEK()&3) continue;
     POKE(0xD020U,0);
   }
 
   // End multi-sector write
   if (sector_number)
-    POKE(sd_ctl,0x57); // open SD card write gate
+    SD_POKE(0x57); // open SD card write gate
   else
-    POKE(sd_ctl,0x4D); // open SD card write gate for MBR
-  POKE(sd_ctl,0x06);
+    SD_POKE(0x4D); // open SD card write gate for MBR
+  SD_POKE(0x06);
 
   // Wait for SD card to go busy
-  while (!(PEEK(sd_ctl)&3)) continue;
+  while (!(SD_PEEK()&3)) continue;
   
   // Wait for SD card to go ready
-  while (PEEK(sd_ctl)&3) continue;
+  while (SD_PEEK()&3) continue;
   
   // Read sectors and see what is there already, checking for the markers we wrote
   if (!verify_errors) {
@@ -681,31 +853,31 @@ void sdcard_erase(const uint32_t first_sector, const uint32_t last_sector)
 
 #ifndef NOFAST_ERASE
     // Wait for SD card to go ready
-    while (PEEK(sd_ctl) & 3)
+    while (SD_PEEK() & 3)
       continue;
 
     if (n)
-      POKE(sd_ctl, 0x57); // open SD card write gate
+      SD_POKE(0x57); // open SD card write gate
     else
-      POKE(sd_ctl, 0x4D); // open SD card write gate for MBR
+      SD_POKE(0x4D); // open SD card write gate for MBR
     if (n == first_sector) {
       // First sector of multi-sector write
-      POKE(sd_ctl, 0x04);
+      SD_POKE(0x04);
     }
     else if (n == last_sector) {
       // Last sector of multi-sector write
-      POKE(sd_ctl, 0x06);
+      SD_POKE(0x06);
     }
     else
       // All other sectors
-      POKE(sd_ctl, 0x05);
+      SD_POKE(0x05);
 
     // Wait for SD card to go busy
-    while (!(PEEK(sd_ctl) & 3))
+    while (!(SD_PEEK() & 3))
       continue;
 
     // Wait for SD card to go ready
-    while (PEEK(sd_ctl) & 3)
+    while (SD_PEEK() & 3)
       continue;
 
 #else
