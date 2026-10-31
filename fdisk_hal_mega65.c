@@ -446,6 +446,17 @@ void flash_read512bytes(const uint32_t byte_offset)
 
 uint8_t verify_buffer[512];
 
+// Wait a little for a command to show BUSY, but not for ever: the native
+// controller answers a read from its sector cache in microseconds, and its
+// BUSY can be over before the first poll (it is set as the command is
+// written, so a following wait for ready is still safe).
+void sd_wait_busy(void)
+{
+  unsigned char n = 100;
+  while (!(SD_PEEK() & 3) && --n)
+    continue;
+}
+
 // Wait for the SD controller to be ready, for several seconds: a slow card
 // can be busy for over 0.2 s after a write, and a reset before it is done
 // can leave it busy for seconds more at its next init.  1 if still busy.
@@ -532,8 +543,7 @@ void sdcard_writesector(const uint32_t sector_number)
       SD_POKE(0x4D); // open SD card write gate for MBR
     SD_POKE(3);
 
-    while (!(SD_PEEK() & 3))
-      continue;
+    sd_wait_busy();
 
     // Wait for write to complete
     while (sd_wait_ready()) {
@@ -570,9 +580,7 @@ void sdcard_writesector(const uint32_t sector_number)
 
       SD_POKE(2); // read the sector we just wrote
 
-      while (!(SD_PEEK() & 3)) {
-        continue;
-      }
+      sd_wait_busy();
 
       while (SD_PEEK() & 3) {
         continue;
@@ -632,8 +640,7 @@ void sdcard_readspeed_test(void)
     while (SD_PEEK() & 3)
       continue;
     SD_POKE(0x02);
-    while (!(SD_PEEK() & 3))
-      continue;
+    sd_wait_busy();
     while (SD_PEEK() & 3) {
       if (PEEK(0xD012U) != last_raster) {
         total_time++;
@@ -729,7 +736,7 @@ void multisector_write_test(void)
   SD_POKE(0x06);
 
   // Wait for SD card to go busy
-  while (!(SD_PEEK()&3)) continue;
+  sd_wait_busy();
   
   // Wait for SD card to go ready
   while (SD_PEEK()&3) continue;
@@ -800,7 +807,7 @@ void multisector_write_test(void)
   SD_POKE(0x06);
 
   // Wait for SD card to go busy
-  while (!(SD_PEEK()&3)) continue;
+  sd_wait_busy();
   
   // Wait for SD card to go ready
   while (SD_PEEK()&3) continue;
@@ -873,8 +880,7 @@ void sdcard_erase(const uint32_t first_sector, const uint32_t last_sector)
       SD_POKE(0x05);
 
     // Wait for SD card to go busy
-    while (!(SD_PEEK() & 3))
-      continue;
+    sd_wait_busy();
 
     // Wait for SD card to go ready
     while (SD_PEEK() & 3)
